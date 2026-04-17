@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { INSTRUMENTS, PACKAGES, timeToMins, minsToTime, DAY_NAMES } from '../types'
-import type { Schedule, Student, Room, Lesson, Teacher } from '../types'
+import type { Schedule, Student, Room, Lesson } from '../types'
 import {
   getStudents, getScheduleByDate, createSchedule, createLesson, updateLesson,
   deleteLesson, toggleAttendance, copyLastWeek, getSchedules,
-  createStudent, updateStudent, deleteStudent, insertBreak, getTeachers, updateRoom
+  createStudent, updateStudent, deleteStudent, insertBreak
 } from '../api'
 import './SchedulePage.css'
 
