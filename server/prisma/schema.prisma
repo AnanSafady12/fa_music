@@ -40,6 +40,7 @@ model Teacher {
   phone         String?
   instrument    Instrument?
   costPerLesson Float    @default(0)
+  rooms         Room[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -58,6 +59,8 @@ model Room {
   name       String
   schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   scheduleId Int
+  teacher    Teacher? @relation(fields: [teacherId], references: [id])
+  teacherId  Int?
   lessons    Lesson[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
