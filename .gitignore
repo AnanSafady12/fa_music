@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+.DS_Store
+
+# Frontend
+client/dist/
+client/node_modules/
+
+# Backend
+server/dist/
+server/node_modules/
+server/.env
+
+# Prisma
+server/prisma/dev.db
+server/prisma/dev.db-journal
+
+# IDE
+.vscode/
+.idea/
+.gemini/

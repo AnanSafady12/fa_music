@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Instrument {
+  Piano
+  Oud
+  Guitar
+  Aorg
+  Drums
+  Darbuka
+  Singing
+  Qanon
+}
+
+model Student {
+  id               Int        @id @default(autoincrement())
+  name             String
+  parentName       String?
+  phone            String?
+  instrument       Instrument?
+  totalLessons     Int        @default(0)
+  completedLessons Int        @default(0)
+  hasPaid          Boolean    @default(false)
+  amountPaid       Float      @default(0)
+  notes            String?
+  lessons          Lesson[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model Teacher {
+  id            Int      @id @default(autoincrement())
+  name          String
+  phone         String?
+  instrument    Instrument?
+  costPerLesson Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Schedule {
+  id        Int      @id @default(autoincrement())
+  dayName   String
+  date      DateTime @unique
+  rooms     Room[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Room {
+  id         Int      @id @default(autoincrement())
+  name       String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId Int
+  lessons    Lesson[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Lesson {
+  id        Int      @id @default(autoincrement())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId    Int
+  student   Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  studentId Int?
+  startTime String
+  endTime   String
+  made      Boolean  @default(true)
+  isProcessed Boolean @default(false)
+  isBreak   Boolean  @default(false)
+  breakLabel String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
