@@ -139,6 +139,8 @@ export default function SchedulePage() {
 
   const openAddStudent = () => { setEditingStudent(null); setStudentForm({ name: '', parentName: '', phone: '', phone2: '', age: '', instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' }); setStudentModal(true) }
   const openEditStudent = (s: Student) => { setEditingStudent(s); setStudentForm({ name: s.name, parentName: s.parentName || '', phone: s.phone || '', phone2: s.phone2 || '', age: s.age || '', instrument: s.instrument || '', totalLessons: s.totalLessons, completedLessons: s.completedLessons, hasPaid: s.hasPaid, notes: s.notes || '' }); setStudentModal(true) }
+  const saveStudent = async () => {
+    const payload = { ...studentForm, age: studentForm.age === '' ? null : Number(studentForm.age), instrument: studentForm.instrument || null, totalLessons: Number(studentForm.totalLessons), completedLessons: Number(studentForm.completedLessons), hasPaid: studentForm.hasPaid }
     if (editingStudent) { await updateStudent(editingStudent.id, payload) } else { await createStudent(payload) }
     setStudentModal(false); loadStudents()
   }
