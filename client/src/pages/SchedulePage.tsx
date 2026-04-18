@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { INSTRUMENTS, PACKAGES, timeToMins, minsToTime, DAY_NAMES } from '../types'
-import type { Schedule, Student, Room, Lesson } from '../types'
+import type { Schedule, Student, Room, Lesson, Teacher } from '../types'
 import {
   getStudents, getScheduleByDate, createSchedule, createLesson, updateLesson,
   deleteLesson, toggleAttendance, copyLastWeek, getSchedules,
-  createStudent, updateStudent, deleteStudent, insertBreak
+  createStudent, updateStudent, deleteStudent, insertBreak, updateRoom, getTeachers
 } from '../api'
 import './SchedulePage.css'
 
@@ -31,7 +31,7 @@ export default function SchedulePage() {
   const [breakDuration, setBreakDuration] = useState<number>(15)
   const [studentModal, setStudentModal] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
-  const [studentForm, setStudentForm] = useState({ name: '', parentName: '', phone: '', instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' })
+  const [studentForm, setStudentForm] = useState({ name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' })
 
   const loadStudents = async () => setStudents(await getStudents())
   const loadAllSchedules = async () => setAllSchedules(await getSchedules())
@@ -64,8 +64,6 @@ export default function SchedulePage() {
     loadSchedule(selectedDate)
   }, [selectedDate, loadSchedule])
 
-  // Auto-creation now handles logic inside loadSchedule
-
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const handleDragStart = (e: DragStartEvent) => {
@@ -84,9 +82,8 @@ export default function SchedulePage() {
     if (!room) return
 
     const existingLesson = room.lessons.find(l => l.startTime === time)
-    if (existingLesson) return // slot occupied
+    if (existingLesson) return
 
-    // Check if student is being moved from another slot
     let fromLesson: Lesson | null = null
     for (const r of schedule.rooms) {
       const l = r.lessons.find(l => l.studentId === studentId && !l.isBreak)
@@ -132,17 +129,24 @@ export default function SchedulePage() {
     await loadSchedule(selectedDate)
   }
 
-  // Quick student CRUD
-  const openAddStudent = () => { setEditingStudent(null); setStudentForm({ name: '', parentName: '', phone: '', instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' }); setStudentModal(true) }
-  const openEditStudent = (s: Student) => { setEditingStudent(s); setStudentForm({ name: s.name, parentName: s.parentName || '', phone: s.phone || '', instrument: s.instrument || '', totalLessons: s.totalLessons, completedLessons: s.completedLessons, hasPaid: s.hasPaid, notes: s.notes || '' }); setStudentModal(true) }
+  const handleRenameRoom = async (roomId: number, newName: string) => {
+    setSaving(true)
+    try {
+      await updateRoom(roomId, { name: newName })
+      await loadSchedule(selectedDate)
+    } finally { setSaving(false) }
+  }
+
+  const openAddStudent = () => { setEditingStudent(null); setStudentForm({ name: '', parentName: '', phone: '', phone2: '', age: '', instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' }); setStudentModal(true) }
+  const openEditStudent = (s: Student) => { setEditingStudent(s); setStudentForm({ name: s.name, parentName: s.parentName || '', phone: s.phone || '', phone2: s.phone2 || '', age: s.age || '', instrument: s.instrument || '', totalLessons: s.totalLessons, completedLessons: s.completedLessons, hasPaid: s.hasPaid, notes: s.notes || '' }); setStudentModal(true) }
   const saveStudent = async () => {
-    const payload = { ...studentForm, instrument: studentForm.instrument || null, totalLessons: Number(studentForm.totalLessons), completedLessons: Number(studentForm.completedLessons), hasPaid: studentForm.hasPaid }
+    const payload = { ...studentForm, age: studentForm.age === '' ? null : Number(studentForm.age), instrument: studentForm.instrument || null, totalLessons: Number(studentForm.totalLessons), completedLessons: Number(studentForm.completedLessons), hasPaid: studentForm.hasPaid }
     if (editingStudent) { await updateStudent(editingStudent.id, payload) } else { await createStudent(payload) }
-    setStudentModal(false); loadStudents()
+    setStudentModal(false); loadData()
   }
   const removeStudent = async (id: number) => {
     if (!confirm('Are you sure you want to delete this student?')) return
-    await deleteStudent(id); loadStudents()
+    await deleteStudent(id); loadData()
   }
 
   const filteredStudents = students.filter(s => {
@@ -153,7 +157,6 @@ export default function SchedulePage() {
 
   return (
     <div className="schedule-page">
-      {/* Top bar */}
       <div className="schedule-header">
         <div className="schedule-header-left">
           <span className="page-title">Schedule Builder</span>
@@ -195,7 +198,6 @@ export default function SchedulePage() {
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="schedule-body">
-          {/* Left panel: student list */}
           <div className="student-panel">
             <div className="student-panel-header">
               <span style={{ fontWeight: 700, fontSize: 13 }}>Students</span>
@@ -216,7 +218,6 @@ export default function SchedulePage() {
             </div>
           </div>
 
-          {/* Right panel: rooms */}
           <div className="rooms-panel">
             {loading ? (
               <div className="empty-state" style={{ gridColumn: '1/-1' }}><p style={{ animation: 'pulse 1.5s infinite' }}>Loading Schedule...</p></div>
@@ -236,6 +237,7 @@ export default function SchedulePage() {
                   onRemove={handleRemoveLesson}
                   onToggleAttendance={handleToggleAttendance}
                   onAddBreak={(time) => setBreakModal({ roomId: room.id, time })}
+                  onRenameRoom={handleRenameRoom}
                 />
               ))
             )}
@@ -252,7 +254,6 @@ export default function SchedulePage() {
         </DragOverlay>
       </DndContext>
 
-      {/* Quick Management Panel */}
       {quickPanelOpen && (
         <div className="quick-panel-overlay" onClick={() => setQuickPanelOpen(false)}>
           <div className="quick-panel" onClick={e => e.stopPropagation()}>
@@ -284,7 +285,6 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* Break modal */}
       {breakModal && (
         <div className="modal-overlay" onClick={() => setBreakModal(null)}>
           <div className="modal" style={{ maxWidth: 340 }} onClick={e => e.stopPropagation()}>
@@ -305,10 +305,9 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* Quick student modal */}
       {studentModal && (
         <div className="modal-overlay" onClick={() => setStudentModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editingStudent ? 'Edit Student' : 'Add Student'}</div>
             <div className="form-row">
               <div className="form-group">
@@ -316,33 +315,36 @@ export default function SchedulePage() {
                 <input className="input" value={studentForm.name} onChange={e => setStudentForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div className="form-group">
+                <label>Age</label>
+                <input type="number" className="input" value={studentForm.age} onChange={e => setStudentForm(f => ({ ...f, age: e.target.value }))} placeholder="Years" />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
                 <label>Instrument</label>
                 <select className="select" value={studentForm.instrument} onChange={e => setStudentForm(f => ({ ...f, instrument: e.target.value }))}>
                   <option value="">Select...</option>
                   {INSTRUMENTS.map(i => <option key={i} value={i}>{i}</option>)}
                 </select>
               </div>
-            </div>
-            <div className="form-row">
               <div className="form-group">
                 <label>Parent Name</label>
                 <input className="input" value={studentForm.parentName} onChange={e => setStudentForm(f => ({ ...f, parentName: e.target.value }))} />
               </div>
+            </div>
+            <div className="form-row">
               <div className="form-group">
-                <label>Phone</label>
+                <label>Phone 1</label>
                 <input className="input" value={studentForm.phone} onChange={e => setStudentForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>Phone 2</label>
+                <input className="input" value={studentForm.phone2} onChange={e => setStudentForm(f => ({ ...f, phone2: e.target.value }))} />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>
-                  Total
-                  {!editingStudent && (
-                    <span style={{color: 'var(--accent)', fontWeight: 600, marginLeft: 6, textTransform: 'none', fontSize: 10}}>
-                      ({PACKAGES.STANDARD.name})
-                    </span>
-                  )}
-                </label>
+                <label>Total Lessons</label>
                 <input className="input" type="number" min="0" value={studentForm.totalLessons} onChange={e => setStudentForm(f => ({ ...f, totalLessons: Number(e.target.value) }))} />
               </div>
               <div className="form-group">
@@ -350,11 +352,9 @@ export default function SchedulePage() {
                 <input className="input" type="number" min="0" value={studentForm.completedLessons} onChange={e => setStudentForm(f => ({ ...f, completedLessons: Number(e.target.value) }))} />
               </div>
             </div>
-            <div className="form-row">
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="checkbox" id="scheduleHasPaid" checked={studentForm.hasPaid} onChange={e => setStudentForm(f => ({ ...f, hasPaid: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-                <label htmlFor="scheduleHasPaid" style={{ margin: 0, cursor: 'pointer' }}>Student has paid for the package</label>
-              </div>
+            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '10px 0' }}>
+              <input type="checkbox" id="scheduleHasPaid" checked={studentForm.hasPaid} onChange={e => setStudentForm(f => ({ ...f, hasPaid: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+              <label htmlFor="scheduleHasPaid" style={{ margin: 0, cursor: 'pointer' }}>Student has paid for the package</label>
             </div>
             <div className="form-group">
               <label>Notes</label>
@@ -405,7 +405,7 @@ function DraggableStudentCard({ student, schedule }: { student: Student; schedul
 }
 
 function generateRoomTimeline(dayName: string, lessons: Lesson[]) {
-  const isWeekend = ['Friday','Saturday','Friday','Saturday'].includes(dayName)
+  const isWeekend = ['Friday','Saturday'].includes(dayName)
   const startMins = timeToMins(isWeekend ? '10:00' : '16:00')
   const endMins = timeToMins(isWeekend ? '20:00' : '21:00')
   const SLOT_DURATION = 45
@@ -440,16 +440,32 @@ function generateRoomTimeline(dayName: string, lessons: Lesson[]) {
   return items
 }
 
-function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak }: {
+function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom }: {
   room: Room; roomIndex: number; dayName: string;
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
   onAddBreak: (time: string) => void
+  onRenameRoom: (id: number, name: string) => void
 }) {
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [tempName, setTempName] = useState(room.name)
+
   return (
     <div className="room-card">
       <div className="room-header">
-        <span className="room-name">{room.name}</span>
+        {isRenaming ? (
+          <input 
+            className="input" 
+            autoFocus 
+            style={{ fontSize: 14, padding: '2px 8px', height: 28 }}
+            value={tempName} 
+            onChange={e => setTempName(e.target.value)}
+            onBlur={() => { setIsRenaming(false); onRenameRoom(room.id, tempName); }}
+            onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
+          />
+        ) : (
+          <span className="room-name" onDoubleClick={() => setIsRenaming(true)} style={{ cursor: 'pointer' }} title="Double-click to rename">{room.name} ✏️</span>
+        )}
         <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{room.lessons.length} lessons</span>
       </div>
       <div className="room-slots">
@@ -493,7 +509,10 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
     const rem = lesson.student.totalLessons - lesson.student.completedLessons
     return (
       <div className={`time-slot occupied ${!lesson.made ? 'not-made' : ''}`}>
-        <span className="slot-time">{time} - {endTimeStr}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <span className="slot-time">{time} - {endTimeStr}</span>
+          {lesson.student.instrument && <span className="tag tag-instrument" style={{ fontSize: 8, padding: '1px 4px' }}>{lesson.student.instrument}</span>}
+        </div>
         <div className="slot-student">
           <span className="slot-name">{lesson.student.name}</span>
           {rem <= 2 && lesson.student.totalLessons > 0 && (
@@ -527,3 +546,4 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
     </div>
   )
 }
+

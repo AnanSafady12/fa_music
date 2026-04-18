@@ -1,18 +1,21 @@
-export type Instrument = 'Piano' | 'Oud' | 'Guitar' | 'Aorg' | 'Drums' | 'Darbuka' | 'Singing' | 'Qanon'
+export type Instrument = 'Piano' | 'Oud' | 'Guitar' | 'Aorg' | 'Drums' | 'Darbuka' | 'Singing' | 'Qanon' | 'Kaman' | 'Cello'
 
-export const INSTRUMENTS: Instrument[] = ['Piano', 'Oud', 'Guitar', 'Aorg', 'Drums', 'Darbuka', 'Singing', 'Qanon']
+export const INSTRUMENTS: Instrument[] = ['Piano', 'Oud', 'Guitar', 'Aorg', 'Drums', 'Darbuka', 'Singing', 'Qanon', 'Kaman', 'Cello']
 
 export interface Student {
   id: number
   name: string
   parentName?: string
   phone?: string
+  phone2?: string
+  age?: number
   instrument?: Instrument
   totalLessons: number
   completedLessons: number
   hasPaid: boolean
   amountPaid: number
   notes?: string
+  registrationDate: string
   createdAt: string
   updatedAt: string
 }
@@ -23,8 +26,18 @@ export interface Teacher {
   instrument?: Instrument
   phone?: string
   costPerLesson: number
+  calculatedSalary?: number
+  earnedSalary?: number
+  notes?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface Worker {
+  id: number
+  name: string
+  costPerHour: number
+  totalHours: number
 }
 
 export interface Lesson {

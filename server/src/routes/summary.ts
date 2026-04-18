@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client'
 const router = Router()
 const prisma = new PrismaClient()
 
+// GET summary
 router.get('/', async (req, res) => {
   try {
     const month = req.query.month ? Number(req.query.month) : null // 1-12
@@ -14,13 +15,26 @@ router.get('/', async (req, res) => {
     const totalStudents = students.length
     const activeStudents = students.filter(s => s.totalLessons > s.completedLessons).length
 
-    // 2. Calculate salaries for teachers based on their instrument
-    const teachers = await prisma.teacher.findMany()
+    // 2. Fetch Teachers and their Monthly Stats
+    const teachers = await prisma.teacher.findMany({
+      include: {
+        monthlyStats: {
+          where: { month: month || -1, year: year || -1 }
+        }
+      }
+    })
     
-    // Fetch all qualified lessons (not strictly isProcessed, but rather time-passed)
+    // 2b. Fetch Worker
+    let worker = await prisma.worker.findFirst()
+    if (!worker) {
+      worker = await prisma.worker.create({ data: { name: 'Worker' } })
+    }
+
+    // 3. Define the time range for lessons
     const baseWhere: any = {
       made: true,
-      isBreak: false
+      isBreak: false,
+      studentId: { not: null }
     }
 
     if (month !== null && year !== null) {
@@ -36,6 +50,7 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // 4. Fetch all "Made" lessons within the range
     const lessons = await prisma.lesson.findMany({
       where: baseWhere,
       include: {
@@ -48,6 +63,7 @@ router.get('/', async (req, res) => {
     const todayIso = now.toISOString().split('T')[0]
     const nowMins = now.getHours() * 60 + now.getMinutes()
 
+    // Filter for lessons that have actually finished
     const processedLessons = lessons.filter(lesson => {
       const scheduleDateIso = new Date(lesson.room.schedule.date).toISOString().split('T')[0]
       const [h, m] = lesson.endTime.split(':').map(Number)
@@ -58,7 +74,7 @@ router.get('/', async (req, res) => {
       return false
     })
 
-    // Count lessons by instrument
+    // 5. Count lessons by instrument
     const instrumentLessonCounts: Record<string, number> = {}
     for (const lesson of processedLessons) {
       const instr = lesson.student?.instrument
@@ -67,20 +83,28 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // 6. Calculate teacher salaries
     const teacherSalaries = teachers.map(teacher => {
+      const stats = teacher.monthlyStats[0] || null
       const lessonsTaught = teacher.instrument ? (instrumentLessonCounts[teacher.instrument] || 0) : 0
-      const earnedSalary = lessonsTaught * teacher.costPerLesson
+      const calculatedSalary = lessonsTaught * teacher.costPerLesson
+      const earnedSalary = stats?.manualSalary !== null && stats?.manualSalary !== undefined ? stats.manualSalary : calculatedSalary
+
       return {
         id: teacher.id,
         name: teacher.name,
         instrument: teacher.instrument || 'None',
         lessonsTaught,
         costPerLesson: teacher.costPerLesson,
-        earnedSalary
+        calculatedSalary,
+        earnedSalary,
+        notes: stats?.notes || ''
       }
     })
 
     const totalTeacherLiabilities = teacherSalaries.reduce((sum, t) => sum + t.earnedSalary, 0)
+    const workerLiability = worker.costPerHour * worker.totalHours
+    const grandTotalLiabilities = totalTeacherLiabilities + workerLiability
 
     res.json({
       students: {
@@ -88,11 +112,45 @@ router.get('/', async (req, res) => {
         activeStudents
       },
       teacherSalaries,
-      totalTeacherLiabilities
+      totalTeacherLiabilities,
+      worker,
+      workerLiability,
+      grandTotalLiabilities
     })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Failed to fetch summary data' })
+  }
+})
+
+// PUT update teacher stats for a specific month
+router.put('/teacher-stats', async (req, res) => {
+  try {
+    const { teacherId, month, year, notes, manualSalary } = req.body
+    const stats = await prisma.monthlyTeacherStats.upsert({
+      where: {
+        teacherId_month_year: {
+          teacherId: Number(teacherId),
+          month: Number(month),
+          year: Number(year)
+        }
+      },
+      update: {
+        notes,
+        manualSalary: manualSalary !== undefined ? (manualSalary === null ? null : Number(manualSalary)) : undefined
+      },
+      create: {
+        teacherId: Number(teacherId),
+        month: Number(month),
+        year: Number(year),
+        notes,
+        manualSalary: manualSalary !== undefined ? (manualSalary === null ? null : Number(manualSalary)) : undefined
+      }
+    })
+    res.json(stats)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to update teacher stats' })
   }
 })
 

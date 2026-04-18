@@ -21,12 +21,58 @@ function addMins(t: string, mins: number) {
 router.post('/', async (req, res) => {
   try {
     const { roomId, studentId, startTime, endTime, isBreak, breakLabel } = req.body
-    const lesson = await prisma.lesson.create({
-      data: { roomId, studentId: studentId || null, startTime, endTime, isBreak: isBreak ?? false, breakLabel },
-      include: { student: true }
+    
+    // Fetch room/schedule to check date
+    const room = await prisma.room.findUnique({
+      where: { id: roomId },
+      include: { schedule: true }
     })
+    if (!room) return res.status(404).json({ error: 'Room not found' })
+
+    const now = new Date()
+    const todayIso = now.toISOString().split('T')[0]
+    const nowMins = now.getHours() * 60 + now.getMinutes()
+    const scheduleDateIso = new Date(room.schedule.date).toISOString().split('T')[0]
+    const [h, m] = endTime.split(':').map(Number)
+    const lessonEndMins = h * 60 + m
+
+    let isPast = false
+    if (scheduleDateIso < todayIso) {
+      isPast = true
+    } else if (scheduleDateIso === todayIso) {
+      if (lessonEndMins <= nowMins) isPast = true
+    }
+
+    const lesson = await prisma.$transaction(async (tx) => {
+      const isActuallyMade = !isBreak
+      const shouldProcess = isPast && isActuallyMade
+
+      const l = await tx.lesson.create({
+        data: { 
+          roomId, 
+          studentId: studentId || null, 
+          startTime, 
+          endTime, 
+          isBreak: isBreak ?? false, 
+          breakLabel,
+          isProcessed: shouldProcess,
+          made: true 
+        },
+        include: { student: true }
+      })
+
+      if (shouldProcess && studentId) {
+        await tx.student.update({
+          where: { id: studentId },
+          data: { completedLessons: { increment: 1 } }
+        })
+      }
+      return l
+    })
+
     res.json(lesson)
-  } catch {
+  } catch (err) {
+    console.error(err)
     res.status(500).json({ error: 'Failed to create lesson' })
   }
 })
@@ -90,15 +136,58 @@ router.put('/:id', async (req, res) => {
 router.patch('/:id/attendance', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const lesson = await prisma.lesson.findUnique({ where: { id } })
-    if (!lesson) return res.status(404).json({ error: 'Lesson not found' })
-    const updated = await prisma.lesson.update({
+    const lesson = await prisma.lesson.findUnique({
       where: { id },
-      data: { made: !lesson.made },
-      include: { student: true }
+      include: { room: { include: { schedule: true } } }
     })
+    if (!lesson) return res.status(404).json({ error: 'Lesson not found' })
+
+    const now = new Date()
+    const todayIso = now.toISOString().split('T')[0]
+    const nowMins = now.getHours() * 60 + now.getMinutes()
+    const scheduleDateIso = new Date(lesson.room.schedule.date).toISOString().split('T')[0]
+    const [h, m] = lesson.endTime.split(':').map(Number)
+    const lessonEndMins = h * 60 + m
+
+    let isPast = false
+    if (scheduleDateIso < todayIso) {
+      isPast = true
+    } else if (scheduleDateIso === todayIso) {
+      if (lessonEndMins <= nowMins) isPast = true
+    }
+
+    const willBeMade = !lesson.made
+    let increment = 0
+    let setProcessed = lesson.isProcessed
+
+    // Logic:
+    // If moving from Made -> Not Made AND isProcessed: DECREMENT, set isProcessed = false
+    // If moving from Not Made -> Made AND isPast: INCREMENT, set isProcessed = true
+    if (lesson.made && !willBeMade && lesson.isProcessed) {
+      increment = -1
+      setProcessed = false
+    } else if (!lesson.made && willBeMade && isPast && !lesson.isProcessed) {
+      increment = 1
+      setProcessed = true
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (increment !== 0 && lesson.studentId) {
+        await tx.student.update({
+          where: { id: lesson.studentId },
+          data: { completedLessons: { increment } }
+        })
+      }
+      return await tx.lesson.update({
+        where: { id },
+        data: { made: willBeMade, isProcessed: setProcessed },
+        include: { student: true }
+      })
+    })
+
     res.json(updated)
-  } catch {
+  } catch (err) {
+    console.error(err)
     res.status(500).json({ error: 'Failed to toggle attendance' })
   }
 })
@@ -107,9 +196,22 @@ router.patch('/:id/attendance', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    await prisma.lesson.delete({ where: { id } })
+    const lesson = await prisma.lesson.findUnique({ where: { id } })
+    if (!lesson) return res.status(404).json({ error: 'Lesson not found' })
+
+    await prisma.$transaction(async (tx) => {
+      if (lesson.isProcessed && lesson.made && lesson.studentId) {
+        await tx.student.update({
+          where: { id: lesson.studentId },
+          data: { completedLessons: { increment: -1 } }
+        })
+      }
+      await tx.lesson.delete({ where: { id } })
+    })
+
     res.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error(err)
     res.status(500).json({ error: 'Failed to delete lesson' })
   }
 })

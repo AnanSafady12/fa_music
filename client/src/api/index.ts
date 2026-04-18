@@ -1,9 +1,12 @@
 import api from './client'
 
+export const login = (password: string) => api.post('/auth/login', { password }).then(r => r.data)
+
 export const getStudents = () => api.get('/students').then(r => r.data)
 export const createStudent = (data: any) => api.post('/students', data).then(r => r.data)
 export const updateStudent = (id: number, data: any) => api.put(`/students/${id}`, data).then(r => r.data)
 export const deleteStudent = (id: number) => api.delete(`/students/${id}`).then(r => r.data)
+export const getStudentHistory = (id: number) => api.get(`/students/${id}/history`).then(r => r.data)
 
 export const getTeachers = () => api.get('/teachers').then(r => r.data)
 export const createTeacher = (data: any) => api.post('/teachers', data).then(r => r.data)
@@ -24,3 +27,8 @@ export const deleteLesson = (id: number) => api.delete(`/lessons/${id}`).then(r 
 
 export const updateRoom = (id: number, data: any) => api.put(`/schedules/rooms/${id}`, data).then(r => r.data)
 export const getSummary = (month?: number, year?: number) => api.get('/summary', { params: { month, year } }).then(r => r.data)
+export const updateTeacherStats = (data: { teacherId: number, month: number, year: number, notes?: string, manualSalary?: number | null }) => 
+  api.put('/summary/teacher-stats', data).then(r => r.data)
+
+export const getWorker = () => api.get('/worker').then(r => r.data)
+export const updateWorker = (data: any) => api.put('/worker', data).then(r => r.data)

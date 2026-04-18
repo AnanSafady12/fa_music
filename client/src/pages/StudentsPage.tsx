@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { Student } from '../types'
 import { INSTRUMENTS, PACKAGES } from '../types'
-import { getStudents, createStudent, updateStudent, deleteStudent } from '../api'
+import { getStudents, createStudent, updateStudent, deleteStudent, getStudentHistory } from '../api'
 
-const emptyForm = { name: '', parentName: '', phone: '', instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' }
+const emptyForm = { name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' }
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
@@ -14,6 +14,11 @@ export default function StudentsPage() {
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<Student | null>(null)
+  
+  // History Modal State
+  const [historyStudent, setHistoryStudent] = useState<Student | null>(null)
+  const [history, setHistory] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   const load = async () => {
     try { setStudents(await getStudents()) } catch {} finally { setLoading(false) }
@@ -23,13 +28,44 @@ export default function StudentsPage() {
   const openAdd = () => { setEditing(null); setForm(emptyForm); setModalOpen(true) }
   const openEdit = (s: Student) => {
     setEditing(s)
-    setForm({ name: s.name, parentName: s.parentName || '', phone: s.phone || '', instrument: s.instrument || '', totalLessons: s.totalLessons, completedLessons: s.completedLessons, hasPaid: s.hasPaid, notes: s.notes || '' })
+    setForm({ 
+      name: s.name, 
+      parentName: s.parentName || '', 
+      phone: s.phone || '', 
+      phone2: s.phone2 || '',
+      age: s.age || '',
+      instrument: s.instrument || '', 
+      totalLessons: s.totalLessons, 
+      completedLessons: s.completedLessons, 
+      hasPaid: s.hasPaid, 
+      notes: s.notes || '' 
+    })
     setModalOpen(true)
   }
   const closeModal = () => setModalOpen(false)
 
+  const openHistory = async (s: Student) => {
+    setHistoryStudent(s)
+    setLoadingHistory(true)
+    try {
+      const data = await getStudentHistory(s.id)
+      setHistory(data)
+    } catch {
+      setHistory([])
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
   const save = async () => {
-    const payload = { ...form, instrument: form.instrument || null, totalLessons: Number(form.totalLessons), completedLessons: Number(form.completedLessons), hasPaid: form.hasPaid }
+    const payload = { 
+      ...form, 
+      age: form.age === '' ? null : Number(form.age),
+      instrument: form.instrument || null, 
+      totalLessons: Number(form.totalLessons), 
+      completedLessons: Number(form.completedLessons), 
+      hasPaid: form.hasPaid 
+    }
     if (editing) { await updateStudent(editing.id, payload) } else { await createStudent(payload) }
     closeModal(); load()
   }
@@ -41,23 +77,15 @@ export default function StudentsPage() {
   }
 
   const togglePaid = async (s: Student) => {
-    // Quick toggle for the paid status
     const newStatus = !s.hasPaid
-    // Optimistic update
     setStudents(prev => prev.map(st => st.id === s.id ? { ...st, hasPaid: newStatus } : st))
-    // Backend update
     await updateStudent(s.id, { ...s, hasPaid: newStatus })
   }
 
   const renewPack = async (s: Student) => {
     if (!confirm(`Renew packet for ${s.name}? This will add 4 lessons.`)) return
-    
-    // Add 4 to total lessons
     const newTotal = s.totalLessons + 4
-    
-    // Optimistic update
     setStudents(prev => prev.map(st => st.id === s.id ? { ...st, totalLessons: newTotal } : st))
-    // Backend update
     await updateStudent(s.id, { ...s, totalLessons: newTotal })
   }
 
@@ -100,11 +128,11 @@ export default function StudentsPage() {
                 <tr>
                   <th>Name</th>
                   <th>Instrument</th>
-                  <th>Parent</th>
-                  <th>Phone</th>
+                  <th>Age</th>
+                  <th>Phones</th>
                   <th>Lessons</th>
                   <th>Paid?</th>
-                  <th>Notes</th>
+                  <th>Registered</th>
                   <th></th>
                 </tr>
               </thead>
@@ -113,35 +141,45 @@ export default function StudentsPage() {
                   const left = leftaining(s)
                   const pct = s.totalLessons > 0 ? Math.round((s.completedLessons / s.totalLessons) * 100) : 0
                   return (
-                    <tr key={s.id}>
-                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.name}</td>
+                    <tr 
+                      key={s.id} 
+                      onDoubleClick={() => openHistory(s)} 
+                      style={{ cursor: 'pointer' }}
+                      title="Double-click to view history"
+                    >
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s.parentName || 'No Parent'}</div>
+                      </td>
                       <td>{s.instrument ? <span className="tag tag-instrument">{s.instrument}</span> : '—'}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{s.parentName || '—'}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{s.phone || '—'}</td>
+                      <td style={{ color: 'var(--text-secondary)' }}>{s.age || '—'}</td>
+                      <td>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{s.phone || '—'}</div>
+                        {s.phone2 && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{s.phone2}</div>}
+                      </td>
                       <td style={{ minWidth: 120 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.completedLessons}/{s.totalLessons}</span>
-                          {left <= 2 && s.totalLessons > 0 && (
-                            <span className="tag tag-warning" style={{ fontSize: 10 }}>{left === 0 ? 'Complete!' : `${left} left`}</span>
-                          )}
                         </div>
                         <div className="lessons-bar" style={{ width: 100 }}>
                           <div className="lessons-bar-fill" style={{ width: `${pct}%`, ...(left <= 2 ? { background: 'var(--red)' } : {}) }} />
                         </div>
                       </td>
-                      <td onClick={() => togglePaid(s)} style={{ cursor: 'pointer' }} title="Click to toggle paid status">
+                      <td onClick={(e) => { e.stopPropagation(); togglePaid(s); }} style={{ cursor: 'pointer' }}>
                         {s.hasPaid ? (
-                          <span className="tag tag-instrument" style={{ background: 'var(--green)', color: '#fff', transition: '0.2s' }}>Paid</span>
+                          <span className="tag tag-instrument" style={{ background: 'var(--green)', color: '#fff' }}>Paid</span>
                         ) : (
-                          <span className="tag tag-warning" style={{ background: 'var(--surface)', border: '1px solid var(--red)', color: 'var(--red)', transition: '0.2s' }}>Unpaid</span>
+                          <span className="tag tag-warning" style={{ background: 'var(--surface)', border: '1px solid var(--red)', color: 'var(--red)' }}>Unpaid</span>
                         )}
                       </td>
-                      <td style={{ color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.notes || '—'}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                        {new Date(s.registrationDate).toLocaleDateString()}
+                      </td>
                       <td>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                          <button className="btn btn-secondary btn-sm" onClick={() => renewPack(s)} title="Add 4 lessons" style={{ fontSize: 11, padding: '2px 8px' }}>+ Pack</button>
-                          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openEdit(s)} title="Edit">✏️</button>
-                          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleteConfirm(s)} title="Delete">🗑️</button>
+                          <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); renewPack(s); }} title="Add 4 lessons">+ Pack</button>
+                          <button className="btn btn-ghost btn-sm btn-icon" onClick={(e) => { e.stopPropagation(); openEdit(s); }}>✏️</button>
+                          <button className="btn btn-danger btn-sm btn-icon" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(s); }}>🗑️</button>
                         </div>
                       </td>
                     </tr>
@@ -156,13 +194,21 @@ export default function StudentsPage() {
       {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editing ? 'Edit Student' : 'Add Student'}</div>
+            
             <div className="form-row">
               <div className="form-group">
                 <label>Name *</label>
                 <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Student name" />
               </div>
+              <div className="form-group">
+                <label>Age</label>
+                <input type="number" className="input" value={form.age} onChange={e => setForm(f => ({ ...f, age: e.target.value }))} placeholder="Years" />
+              </div>
+            </div>
+
+            <div className="form-row">
               <div className="form-group">
                 <label>Instrument</label>
                 <select className="select" value={form.instrument} onChange={e => setForm(f => ({ ...f, instrument: e.target.value }))}>
@@ -170,49 +216,101 @@ export default function StudentsPage() {
                   {INSTRUMENTS.map(i => <option key={i} value={i}>{i}</option>)}
                 </select>
               </div>
-            </div>
-            <div className="form-row">
               <div className="form-group">
                 <label>Parent Name</label>
                 <input className="input" value={form.parentName} onChange={e => setForm(f => ({ ...f, parentName: e.target.value }))} placeholder="Parent name" />
               </div>
-              <div className="form-group">
-                <label>Phone</label>
-                <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+961 …" />
-              </div>
             </div>
+
             <div className="form-row">
               <div className="form-group">
-                <label>
-                  Total Lessons
-                  {!editing && (
-                    <span style={{color: 'var(--accent)', fontWeight: 600, marginLeft: 6, textTransform: 'none'}}>
-                      ({PACKAGES.STANDARD.name} - ₪{PACKAGES.STANDARD.price})
-                    </span>
-                  )}
-                </label>
+                <label>Phone 1</label>
+                <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Primary number" />
+              </div>
+              <div className="form-group">
+                <label>Phone 2</label>
+                <input className="input" value={form.phone2} onChange={e => setForm(f => ({ ...f, phone2: e.target.value }))} placeholder="Secondary number" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Total Lessons</label>
                 <input className="input" type="number" min="0" value={form.totalLessons} onChange={e => setForm(f => ({ ...f, totalLessons: Number(e.target.value) }))} />
               </div>
               <div className="form-group">
-                <label>Completed</label>
-                <input className="input" type="number" min="0" value={form.completedLessons} onChange={e => setForm(f => ({ ...f, completedLessons: Number(e.target.value) }))} />
+                <label>Completed (Auto-tracked)</label>
+                <input className="input" type="number" readOnly value={form.completedLessons} style={{ opacity: 0.7, cursor: 'not-allowed', background: 'var(--surface)' }} />
               </div>
             </div>
-            <div className="form-row">
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="checkbox" id="hasPaid" checked={form.hasPaid} onChange={e => setForm(f => ({ ...f, hasPaid: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-                <label htmlFor="hasPaid" style={{ margin: 0, cursor: 'pointer' }}>Student has paid for the package</label>
-              </div>
+
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, margin: '10px 0' }}>
+              <input type="checkbox" id="hasPaid" checked={form.hasPaid} onChange={e => setForm(f => ({ ...f, hasPaid: e.target.checked }))} style={{ width: 18, height: 18 }} />
+              <label htmlFor="hasPaid" style={{ margin: 0 }}>Student has paid for the package</label>
             </div>
+
             <div className="form-group">
               <label>Notes</label>
               <input className="input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes…" />
             </div>
+
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
               <button className="btn btn-primary" onClick={save} disabled={!form.name.trim()}>
                 {editing ? 'Save Changes' : 'Add Student'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {historyStudent && (
+        <div className="modal-overlay" onClick={() => setHistoryStudent(null)}>
+          <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Lesson History: {historyStudent.name}</div>
+            
+            <div style={{ maxHeight: 400, overflowY: 'auto', marginTop: 15 }}>
+              {loadingHistory ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>Loading history…</div>
+              ) : history.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No completed lessons recorded.</div>
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Room</th>
+                      <th>Time</th>
+                      <th>Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((h: any) => {
+                      const startTime = h.startTime
+                      const endTime = h.endTime
+                      const dateObj = new Date(h.room.schedule.date)
+                      const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' })
+                      const dateStr = dateObj.toLocaleDateString()
+                      return (
+                        <tr key={h.id}>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{dayName}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{dateStr}</div>
+                          </td>
+                          <td>{h.room.name}</td>
+                          <td>{startTime} - {endTime}</td>
+                          <td>{h.isBreak ? '—' : 'Lesson'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            
+            <div className="modal-actions">
+              <button className="btn btn-primary" onClick={() => setHistoryStudent(null)}>Close</button>
             </div>
           </div>
         </div>
@@ -224,7 +322,7 @@ export default function StudentsPage() {
           <div className="modal" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">Delete Student</div>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-              Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>{deleteConfirm.name}</strong>? This will also remove their scheduled lessons.
+              Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>{deleteConfirm.name}</strong>?
             </p>
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
@@ -236,3 +334,4 @@ export default function StudentsPage() {
     </div>
   )
 }
+

@@ -9,7 +9,7 @@ router.get('/', async (_req, res) => {
   try {
     const schedules = await prisma.schedule.findMany({
       orderBy: { date: 'asc' },
-      include: { rooms: { include: { lessons: { include: { student: true } } } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true } } } } }
     })
     res.json(schedules)
   } catch {
@@ -23,7 +23,7 @@ router.get('/:id', async (req, res) => {
     const id = Number(req.params.id)
     const schedule = await prisma.schedule.findUnique({
       where: { id },
-      include: { rooms: { include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
     })
     if (!schedule) return res.status(404).json({ error: 'Schedule not found' })
     res.json(schedule)
@@ -38,7 +38,7 @@ router.get('/by-date/:date', async (req, res) => {
     const date = new Date(req.params.date)
     const schedule = await prisma.schedule.findUnique({
       where: { date },
-      include: { rooms: { include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
     })
     if (!schedule) return res.status(404).json({ error: 'No schedule for this date' })
     res.json(schedule)
@@ -76,7 +76,7 @@ router.post('/:id/copy-last-week', async (req, res) => {
 
     const source = await prisma.schedule.findUnique({
       where: { id: sourceId },
-      include: { rooms: { include: { lessons: true } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: true } } }
     })
     if (!source) return res.status(404).json({ error: 'Source schedule not found' })
 
@@ -121,7 +121,7 @@ router.post('/:id/copy-last-week', async (req, res) => {
 
     const result = await prisma.schedule.findUnique({
       where: { id: (target as any).id },
-      include: { rooms: { include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
     })
     res.json(result)
   } catch (e) {
@@ -145,10 +145,13 @@ router.delete('/:id', async (req, res) => {
 router.put('/rooms/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { teacherId } = req.body
+    const { teacherId, name } = req.body
     const room = await prisma.room.update({
       where: { id },
-      data: { teacherId: teacherId || null }
+      data: { 
+        teacherId: teacherId !== undefined ? (teacherId || null) : undefined,
+        name: name !== undefined ? name : undefined
+      }
     })
     res.json(room)
   } catch {

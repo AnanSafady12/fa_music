@@ -17,9 +17,20 @@ router.get('/', async (_req, res) => {
 // POST create student
 router.post('/', async (req, res) => {
   try {
-    const { name, parentName, phone, instrument, totalLessons, completedLessons, hasPaid, notes } = req.body
+    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, notes } = req.body
     const student = await prisma.student.create({
-      data: { name, parentName, phone, instrument, totalLessons: totalLessons ?? 0, completedLessons: completedLessons ?? 0, hasPaid: hasPaid ?? false, notes }
+      data: { 
+        name, 
+        parentName, 
+        phone, 
+        phone2, 
+        age: age ? Number(age) : null, 
+        instrument, 
+        totalLessons: totalLessons ?? 0, 
+        completedLessons: completedLessons ?? 0, 
+        hasPaid: hasPaid ?? false, 
+        notes 
+      }
     })
     res.json(student)
   } catch (e) {
@@ -31,16 +42,28 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { name, parentName, phone, instrument, totalLessons, completedLessons, hasPaid, notes } = req.body
+    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, notes } = req.body
     const student = await prisma.student.update({
       where: { id },
-      data: { name, parentName, phone, instrument, totalLessons, completedLessons, hasPaid, notes }
+      data: { 
+        name, 
+        parentName, 
+        phone, 
+        phone2, 
+        age: age ? Number(age) : null, 
+        instrument, 
+        totalLessons, 
+        completedLessons, 
+        hasPaid, 
+        notes 
+      }
     })
     res.json(student)
   } catch (e) {
     res.status(500).json({ error: 'Failed to update student' })
   }
 })
+
 
 // DELETE student
 router.delete('/:id', async (req, res) => {
@@ -50,6 +73,25 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true })
   } catch (e) {
     res.status(500).json({ error: 'Failed to delete student' })
+  }
+})
+
+// GET student history
+router.get('/:id/history', async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const lessons = await prisma.lesson.findMany({
+      where: { studentId: id, made: true },
+      include: {
+        room: {
+          include: { schedule: true }
+        }
+      },
+      orderBy: { room: { schedule: { date: 'desc' } } }
+    })
+    res.json(lessons)
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch student history' })
   }
 })
 

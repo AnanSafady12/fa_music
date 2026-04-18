@@ -16,6 +16,8 @@ enum Instrument {
   Darbuka
   Singing
   Qanon
+  Kaman
+  Cello
 }
 
 model Student {
@@ -23,12 +25,15 @@ model Student {
   name             String
   parentName       String?
   phone            String?
+  phone2           String?
+  age              Int?
   instrument       Instrument?
   totalLessons     Int        @default(0)
   completedLessons Int        @default(0)
   hasPaid          Boolean    @default(false)
   amountPaid       Float      @default(0)
   notes            String?
+  registrationDate DateTime   @default(now())
   lessons          Lesson[]
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -41,8 +46,31 @@ model Teacher {
   instrument    Instrument?
   costPerLesson Float    @default(0)
   rooms         Room[]
+  monthlyStats  MonthlyTeacherStats[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model MonthlyTeacherStats {
+  id           Int      @id @default(autoincrement())
+  teacherId    Int
+  teacher      Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  month        Int
+  year         Int
+  notes        String?
+  manualSalary Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([teacherId, month, year])
+}
+
+model Worker {
+  id           Int      @id @default(autoincrement())
+  name         String   @default("Worker")
+  costPerHour  Float    @default(0)
+  totalHours   Float    @default(0)
+  updatedAt    DateTime @updatedAt
 }
 
 model Schedule {
@@ -81,3 +109,4 @@ model Lesson {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
