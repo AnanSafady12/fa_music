@@ -239,8 +239,8 @@ export default function StudentsPage() {
                 <input className="input" type="number" min="0" value={form.totalLessons} onChange={e => setForm(f => ({ ...f, totalLessons: Number(e.target.value) }))} />
               </div>
               <div className="form-group">
-                <label>Completed (Auto-tracked)</label>
-                <input className="input" type="number" readOnly value={form.completedLessons} style={{ opacity: 0.7, cursor: 'not-allowed', background: 'var(--surface)' }} />
+                <label>Completed Lessons</label>
+                <input className="input" type="number" min="0" value={form.completedLessons} onChange={e => setForm(f => ({ ...f, completedLessons: Number(e.target.value) }))} />
               </div>
             </div>
 
