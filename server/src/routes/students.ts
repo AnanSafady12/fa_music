@@ -17,7 +17,7 @@ router.get('/', async (_req, res) => {
 // POST create student
 router.post('/', async (req, res) => {
   try {
-    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, notes } = req.body
+    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, amountPaid, notes } = req.body
     const student = await prisma.student.create({
       data: { 
         name, 
@@ -29,6 +29,7 @@ router.post('/', async (req, res) => {
         totalLessons: totalLessons ?? 0, 
         completedLessons: completedLessons ?? 0, 
         hasPaid: hasPaid ?? false, 
+        amountPaid: amountPaid ?? 0,
         notes 
       }
     })
@@ -42,7 +43,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, notes } = req.body
+    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, amountPaid, notes } = req.body
     const student = await prisma.student.update({
       where: { id },
       data: { 
@@ -55,6 +56,7 @@ router.put('/:id', async (req, res) => {
         totalLessons, 
         completedLessons, 
         hasPaid, 
+        amountPaid: amountPaid ?? 0,
         notes 
       }
     })

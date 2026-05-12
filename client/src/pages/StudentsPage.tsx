@@ -3,7 +3,7 @@ import type { Student } from '../types'
 import { INSTRUMENTS, PACKAGES } from '../types'
 import { getStudents, createStudent, updateStudent, deleteStudent, getStudentHistory } from '../api'
 
-const emptyForm = { name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' }
+const emptyForm = { name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, amountPaid: 0 as string | number, notes: '' }
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
@@ -38,6 +38,7 @@ export default function StudentsPage() {
       totalLessons: s.totalLessons, 
       completedLessons: s.completedLessons, 
       hasPaid: s.hasPaid, 
+      amountPaid: s.amountPaid || 0,
       notes: s.notes || '' 
     })
     setModalOpen(true)
@@ -64,7 +65,8 @@ export default function StudentsPage() {
       instrument: form.instrument || null, 
       totalLessons: Number(form.totalLessons), 
       completedLessons: Number(form.completedLessons), 
-      hasPaid: form.hasPaid 
+      hasPaid: form.hasPaid,
+      amountPaid: Number(form.amountPaid) || 0
     }
     if (editing) { await updateStudent(editing.id, payload) } else { await createStudent(payload) }
     closeModal(); load()
@@ -244,9 +246,15 @@ export default function StudentsPage() {
               </div>
             </div>
 
-            <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, margin: '10px 0' }}>
-              <input type="checkbox" id="hasPaid" checked={form.hasPaid} onChange={e => setForm(f => ({ ...f, hasPaid: e.target.checked }))} style={{ width: 18, height: 18 }} />
-              <label htmlFor="hasPaid" style={{ margin: 0 }}>Student has paid for the package</label>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Amount Paid (₪)</label>
+                <input className="input" type="number" min="0" value={form.amountPaid} onChange={e => setForm(f => ({ ...f, amountPaid: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'flex-start', paddingTop: 24 }}>
+                <input type="checkbox" id="hasPaid" checked={form.hasPaid} onChange={e => setForm(f => ({ ...f, hasPaid: e.target.checked }))} style={{ width: 18, height: 18 }} />
+                <label htmlFor="hasPaid" style={{ margin: 0 }}>Fully Paid</label>
+              </div>
             </div>
 
             <div className="form-group">
