@@ -1,27 +1,21 @@
 import { PrismaClient } from '@prisma/client'
+
 const prisma = new PrismaClient()
 
-async function main() {
-  const students = await prisma.student.findMany({
-    where: { name: { contains: 'test' } },
-    include: {
-      lessons: {
-        include: {
-          room: { include: { schedule: true } }
-        }
-      }
-    }
-  })
-
+async function debug() {
+  const students = await prisma.student.findMany()
+  console.log('--- ALL STUDENTS ---')
   for (const s of students) {
-    console.log(`Student: ${s.name} (id: ${s.id})`)
-    console.log(`- totalLessons: ${s.totalLessons}`)
-    console.log(`- completedLessons: ${s.completedLessons}`)
-    console.log(`- Lessons found: ${s.lessons.length}`)
-    for (const l of s.lessons) {
-       console.log(`  - Lesson ${l.id}: ${l.startTime}-${l.endTime} on ${l.room.schedule.date.toISOString()} | made: ${l.made} | processed: ${l.isProcessed} | isBreak: ${l.isBreak}`)
-    }
+    console.log(`ID: ${s.id}, Name: ${s.name}, Completed: ${s.completedLessons}, Total: ${s.totalLessons}`)
+  }
+
+  const lessons = await prisma.lesson.findMany({
+    include: { student: true, room: { include: { schedule: true } } }
+  })
+  console.log('--- ALL LESSONS ---')
+  for (const l of lessons) {
+     console.log(`ID: ${l.id}, Date: ${l.room.schedule.date.toISOString()}, Student: ${l.student?.name || 'NULL'}, StudentID: ${l.studentId}, Made: ${l.made}, Processed: ${l.isProcessed}`)
   }
 }
 
-main()
+debug().catch(console.error)
