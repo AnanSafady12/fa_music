@@ -33,6 +33,7 @@ export default function SchedulePage() {
   const [studentModal, setStudentModal] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [studentForm, setStudentForm] = useState({ name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' })
+  const [durationModal, setDurationModal] = useState<{ lesson: Lesson, duration: number } | null>(null)
 
   const loadStudents = async () => setStudents(await getStudents())
   const loadAllSchedules = async () => setAllSchedules(await getSchedules())
@@ -140,6 +141,57 @@ export default function SchedulePage() {
   const handleToggleAttendance = async (lessonId: number) => {
     setSaving(true)
     try { await toggleAttendance(lessonId); await loadSchedule(selectedDate) } finally { setSaving(false) }
+  }
+
+  const handleEditDurationSubmit = async () => {
+    if (!schedule || !durationModal) return
+    const { lesson, duration: newDuration } = durationModal
+    setSaving(true)
+    try {
+      let targetRoom: Room | undefined
+      for (const r of schedule.rooms) {
+        if (r.lessons.find(l => l.id === lesson.id)) {
+          targetRoom = r
+          break
+        }
+      }
+      if (!targetRoom) return
+
+      const oldStart = timeToMins(lesson.startTime)
+      const oldEnd = timeToMins(lesson.endTime)
+      const oldDuration = oldEnd - oldStart
+      const diff = newDuration - oldDuration
+
+      if (diff === 0) {
+        setDurationModal(null)
+        return
+      }
+
+      const roomLessons = [...targetRoom.lessons].sort((a, b) => timeToMins(a.startTime) - timeToMins(b.startTime))
+      const targetIndex = roomLessons.findIndex(l => l.id === lesson.id)
+      
+      const promises = []
+      const newEndTime = minsToTime(oldEnd + diff)
+      promises.push(updateLesson(lesson.id, { endTime: newEndTime }))
+
+      for (let i = targetIndex + 1; i < roomLessons.length; i++) {
+        const l = roomLessons[i]
+        const lStart = timeToMins(l.startTime)
+        const lEnd = timeToMins(l.endTime)
+        promises.push(updateLesson(l.id, { 
+          startTime: minsToTime(lStart + diff),
+          endTime: minsToTime(lEnd + diff)
+        }))
+      }
+
+      await Promise.all(promises)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      await loadSchedule(selectedDate)
+      setSaving(false)
+      setDurationModal(null)
+    }
   }
 
   const handleCopyLastWeek = async () => {
@@ -268,6 +320,7 @@ export default function SchedulePage() {
                   onToggleAttendance={handleToggleAttendance}
                   onAddBreak={(time) => setBreakModal({ roomId: room.id, time })}
                   onRenameRoom={handleRenameRoom}
+                  onEditDuration={(lesson) => setDurationModal({ lesson, duration: timeToMins(lesson.endTime) - timeToMins(lesson.startTime) })}
                 />
               ))
             )}
@@ -399,6 +452,31 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
+
+      {durationModal && (
+        <div className="modal-overlay" onClick={() => setDurationModal(null)}>
+          <div className="modal" style={{ maxWidth: 300 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Edit Duration</div>
+            <div className="form-group">
+              <label>Duration (minutes)</label>
+              <input 
+                type="number" 
+                className="input" 
+                value={durationModal.duration} 
+                onChange={e => setDurationModal(m => m ? { ...m, duration: Number(e.target.value) } : null)}
+                min="5"
+                step="5"
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setDurationModal(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleEditDurationSubmit} disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -471,12 +549,13 @@ function generateRoomTimeline(dayName: string, lessons: Lesson[]) {
   return items
 }
 
-function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom }: {
+function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom, onEditDuration }: {
   room: Room; roomIndex: number; dayName: string;
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
   onAddBreak: (time: string) => void
   onRenameRoom: (id: number, name: string) => void
+  onEditDuration: (lesson: Lesson) => void
 }) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [tempName, setTempName] = useState(room.name)
@@ -510,6 +589,7 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
             onRemove={onRemove}
             onToggleAttendance={onToggleAttendance}
             onAddBreak={onAddBreak}
+            onEditDuration={onEditDuration}
           />
         ))}
       </div>
@@ -517,11 +597,12 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
   )
 }
 
-function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttendance, onAddBreak }: {
+function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttendance, onAddBreak, onEditDuration }: {
   roomIndex: number; time: string; duration: number; lesson?: Lesson
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
   onAddBreak: (time: string) => void
+  onEditDuration: (lesson: Lesson) => void
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `${roomIndex}::${time}` })
   const endTimeStr = minsToTime(timeToMins(time) + duration)
@@ -537,7 +618,7 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   }
 
   if (lesson?.student) {
-    return <DraggableOccupiedSlot setDropRef={setNodeRef} lesson={lesson} time={time} endTimeStr={endTimeStr} onRemove={onRemove} onToggleAttendance={onToggleAttendance} />
+    return <DraggableOccupiedSlot setDropRef={setNodeRef} lesson={lesson} time={time} endTimeStr={endTimeStr} onRemove={onRemove} onToggleAttendance={onToggleAttendance} onEditDuration={onEditDuration} />
   }
 
   return (
@@ -549,13 +630,14 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   )
 }
 
-function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance }: {
+function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance, onEditDuration }: {
   setDropRef: (el: HTMLElement | null) => void
   lesson: Lesson
   time: string
   endTimeStr: string
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
+  onEditDuration: (lesson: Lesson) => void
 }) {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: `lesson-${lesson.id}` })
   const rem = (lesson.student?.totalLessons || 0) - (lesson.student?.completedLessons || 0)
@@ -591,6 +673,7 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
         >
           {lesson.made ? '✓' : '✗'}
         </button>
+        <button className="slot-remove" onClick={() => onEditDuration(lesson)} title="Edit Duration">⏱️</button>
         <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
       </div>
     </div>
