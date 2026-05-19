@@ -205,7 +205,7 @@ export default function FloatingTodoWidget() {
         
         {!isOpen && (
           <button className="widget-fab widget-handle" onClick={handleOpen}>
-            📋
+            <span className="fab-icon">📋</span>
           </button>
         )}
       </div>

@@ -25,6 +25,10 @@
   transform: scale(1.05);
 }
 
+.fab-icon {
+  filter: grayscale(100%) brightness(0.2) contrast(1.5);
+}
+
 .widget-panel {
   width: 300px;
   height: 400px;
