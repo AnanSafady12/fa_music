@@ -17,6 +17,7 @@ export default function FloatingTodoWidget() {
   const [showMentions, setShowMentions] = useState(false)
   const [mentionFilter, setMentionFilter] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const nodeRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -123,8 +124,8 @@ export default function FloatingTodoWidget() {
   const filteredStudents = students.filter(s => s.name.toLowerCase().includes(mentionFilter)).slice(0, 5)
 
   return (
-    <Draggable handle=".widget-handle" bounds="body" defaultPosition={{x: window.innerWidth - 350, y: window.innerHeight - 500}}>
-      <div className="floating-widget-container">
+    <Draggable nodeRef={nodeRef} handle=".widget-handle" bounds="body" defaultPosition={{x: window.innerWidth - 350, y: window.innerHeight - 500}}>
+      <div ref={nodeRef} className="floating-widget-container">
         {isOpen && (
           <div className="widget-panel">
             <div className="widget-handle">
