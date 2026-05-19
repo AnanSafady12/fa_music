@@ -172,13 +172,14 @@ export default function SchedulePage() {
       
       const promises = []
       const newEndTime = minsToTime(oldEnd + diff)
-      promises.push(updateLesson(lesson.id, { endTime: newEndTime }))
+      promises.push(updateLesson(lesson.id, { ...lesson, endTime: newEndTime }))
 
       for (let i = targetIndex + 1; i < roomLessons.length; i++) {
         const l = roomLessons[i]
         const lStart = timeToMins(l.startTime)
         const lEnd = timeToMins(l.endTime)
         promises.push(updateLesson(l.id, { 
+          ...l,
           startTime: minsToTime(lStart + diff),
           endTime: minsToTime(lEnd + diff)
         }))
