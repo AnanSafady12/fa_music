@@ -9,7 +9,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [search, setSearch] = useState('')
   const [filterInstrument, setFilterInstrument] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'one-left'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'one-left' | 'finished'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Student | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -97,7 +97,8 @@ export default function StudentsPage() {
   // Counts for filter badges (before search/instrument filters)
   const countUnpaid = students.filter(s => !s.hasPaid).length
   const countPaid = students.filter(s => s.hasPaid).length
-  const countOneLeft = students.filter(s => remaining(s) <= 1).length
+  const countOneLeft = students.filter(s => remaining(s) === 1).length
+  const countFinished = students.filter(s => remaining(s) <= 0).length
 
   const filtered = students.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase())
@@ -106,7 +107,8 @@ export default function StudentsPage() {
       statusFilter === 'all' ? true :
       statusFilter === 'paid' ? s.hasPaid :
       statusFilter === 'unpaid' ? !s.hasPaid :
-      statusFilter === 'one-left' ? remaining(s) <= 1 : true
+      statusFilter === 'one-left' ? remaining(s) === 1 :
+      statusFilter === 'finished' ? remaining(s) <= 0 : true
     return matchSearch && matchInstrument && matchStatus
   })
 
@@ -137,6 +139,7 @@ export default function StudentsPage() {
             { key: 'unpaid' as const, label: '💰 Unpaid', count: countUnpaid, color: 'var(--red)' },
             { key: 'paid' as const, label: '✅ Paid', count: countPaid, color: 'var(--green)' },
             { key: 'one-left' as const, label: '⚠️ 1 Lesson Left', count: countOneLeft, color: '#f59e0b' },
+            { key: 'finished' as const, label: '🏁 Finished', count: countFinished, color: '#6b7280' },
           ]).map(f => (
             <button
               key={f.key}
