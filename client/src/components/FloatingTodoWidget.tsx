@@ -182,7 +182,7 @@ export default function FloatingTodoWidget() {
         )}
         
         {!isOpen && (
-          <button className="widget-fab" onClick={() => setIsOpen(true)}>
+          <button className="widget-fab widget-handle" onClick={() => setIsOpen(true)}>
             📋
           </button>
         )}
