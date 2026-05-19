@@ -25,6 +25,16 @@ export default function FloatingTodoWidget() {
     getStudents().then(setStudents).catch(console.error)
   }, [])
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (isOpen && nodeRef.current && !nodeRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen])
+
   const loadTodos = async () => {
     try {
       const data = await getTodos()
