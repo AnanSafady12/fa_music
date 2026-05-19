@@ -18,6 +18,7 @@ export default function FloatingTodoWidget() {
   const [mentionFilter, setMentionFilter] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const nodeRef = useRef<HTMLDivElement>(null)
+  const isDragging = useRef(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -133,8 +134,19 @@ export default function FloatingTodoWidget() {
 
   const filteredStudents = students.filter(s => s.name.toLowerCase().includes(mentionFilter)).slice(0, 5)
 
+  const handleOpen = () => {
+    if (!isDragging.current) setIsOpen(true)
+  }
+
   return (
-    <Draggable nodeRef={nodeRef} handle=".widget-handle" bounds="body" defaultPosition={{x: window.innerWidth - 350, y: window.innerHeight - 500}}>
+    <Draggable 
+      nodeRef={nodeRef} 
+      handle=".widget-handle" 
+      bounds="body" 
+      defaultPosition={{x: window.innerWidth - 350, y: window.innerHeight - 500}}
+      onDrag={() => { isDragging.current = true }}
+      onStop={() => { setTimeout(() => { isDragging.current = false }, 100) }}
+    >
       <div ref={nodeRef} className="floating-widget-container">
         {isOpen && (
           <div className="widget-panel">
@@ -192,7 +204,7 @@ export default function FloatingTodoWidget() {
         )}
         
         {!isOpen && (
-          <button className="widget-fab widget-handle" onClick={() => setIsOpen(true)}>
+          <button className="widget-fab widget-handle" onClick={handleOpen}>
             📋
           </button>
         )}
