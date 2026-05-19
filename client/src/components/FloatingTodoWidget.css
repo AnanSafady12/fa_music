@@ -25,6 +25,7 @@
 
 .widget-panel {
   width: 300px;
+  height: 400px;
   background: var(--bg-700);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -32,6 +33,11 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  resize: both;
+  min-width: 250px;
+  min-height: 200px;
+  max-width: 90vw;
+  max-height: 90vh;
 }
 
 .widget-handle {
@@ -62,7 +68,7 @@
 
 .widget-body {
   padding: 12px;
-  max-height: 300px;
+  flex: 1;
   overflow-y: auto;
 }
 
