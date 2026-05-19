@@ -9,6 +9,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [search, setSearch] = useState('')
   const [filterInstrument, setFilterInstrument] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'one-left'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Student | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -91,13 +92,25 @@ export default function StudentsPage() {
     await updateStudent(s.id, { ...s, totalLessons: newTotal, hasPaid: false })
   }
 
+  const remaining = (s: Student) => s.totalLessons - s.completedLessons
+
+  // Counts for filter badges (before search/instrument filters)
+  const countUnpaid = students.filter(s => !s.hasPaid).length
+  const countPaid = students.filter(s => s.hasPaid).length
+  const countOneLeft = students.filter(s => remaining(s) <= 1).length
+
   const filtered = students.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase())
     const matchInstrument = !filterInstrument || s.instrument === filterInstrument
-    return matchSearch && matchInstrument
+    const matchStatus =
+      statusFilter === 'all' ? true :
+      statusFilter === 'paid' ? s.hasPaid :
+      statusFilter === 'unpaid' ? !s.hasPaid :
+      statusFilter === 'one-left' ? remaining(s) <= 1 : true
+    return matchSearch && matchInstrument && matchStatus
   })
 
-  const leftaining = (s: Student) => s.totalLessons - s.completedLessons
+  const leftaining = remaining
 
   return (
     <div className="page">
@@ -111,12 +124,40 @@ export default function StudentsPage() {
 
       <div className="page-body">
         {/* Filters */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <input className="input" placeholder="🔍 Search by name…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 260 }} />
           <select className="select" value={filterInstrument} onChange={e => setFilterInstrument(e.target.value)} style={{ maxWidth: 180 }}>
             <option value="">All Instruments</option>
             {INSTRUMENTS.map(i => <option key={i} value={i}>{i}</option>)}
           </select>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+          {([
+            { key: 'all' as const, label: 'All', count: students.length, color: undefined },
+            { key: 'unpaid' as const, label: '💰 Unpaid', count: countUnpaid, color: 'var(--red)' },
+            { key: 'paid' as const, label: '✅ Paid', count: countPaid, color: 'var(--green)' },
+            { key: 'one-left' as const, label: '⚠️ 1 Lesson Left', count: countOneLeft, color: '#f59e0b' },
+          ]).map(f => (
+            <button
+              key={f.key}
+              className={`btn btn-sm ${statusFilter === f.key ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStatusFilter(f.key)}
+              style={{
+                position: 'relative',
+                ...(statusFilter === f.key && f.color ? { background: f.color, borderColor: f.color } : {})
+              }}
+            >
+              {f.label}
+              <span style={{
+                marginLeft: 6,
+                background: statusFilter === f.key ? 'rgba(255,255,255,0.25)' : 'var(--surface)',
+                padding: '1px 7px',
+                borderRadius: 10,
+                fontSize: 11,
+                fontWeight: 700
+              }}>{f.count}</span>
+            </button>
+          ))}
         </div>
 
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
