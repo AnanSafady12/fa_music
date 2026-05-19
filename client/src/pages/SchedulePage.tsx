@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
+
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { INSTRUMENTS, PACKAGES, timeToMins, minsToTime, DAY_NAMES } from '../types'
 import type { Schedule, Student, Room, Lesson } from '../types'
@@ -67,8 +68,17 @@ export default function SchedulePage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const handleDragStart = (e: DragStartEvent) => {
-    const student = students.find(s => `student-${s.id}` === e.active.id)
-    if (student) setDragging(student)
+    const activeId = String(e.active.id)
+    if (activeId.startsWith('student-')) {
+      const student = students.find(s => `student-${s.id}` === activeId)
+      if (student) setDragging(student)
+    } else if (activeId.startsWith('lesson-') && schedule) {
+      const lessonId = Number(activeId.replace('lesson-', ''))
+      for (const r of schedule.rooms) {
+        const l = r.lessons.find(l => l.id === lessonId)
+        if (l?.student) { setDragging(l.student); break }
+      }
+    }
   }
 
   const handleDragEnd = async (e: DragEndEvent) => {
@@ -76,7 +86,21 @@ export default function SchedulePage() {
     const { active, over } = e
     if (!over || !schedule) return
 
-    const studentId = Number(String(active.id).replace('student-', ''))
+    const activeId = String(active.id)
+    let studentId: number
+    if (activeId.startsWith('student-')) {
+      studentId = Number(activeId.replace('student-', ''))
+    } else if (activeId.startsWith('lesson-')) {
+      const lessonId = Number(activeId.replace('lesson-', ''))
+      let found: Lesson | undefined
+      for (const r of schedule.rooms) {
+        found = r.lessons.find(l => l.id === lessonId)
+        if (found) break
+      }
+      if (!found?.studentId) return
+      studentId = found.studentId
+    } else return
+
     const [roomIdx, time] = String(over.id).split('::')
     const room = schedule.rooms[Number(roomIdx)]
     if (!room) return
@@ -377,6 +401,7 @@ export default function SchedulePage() {
 
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 
+
 function DraggableStudentCard({ student, schedule }: { student: Student; schedule: Schedule | null }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `student-${student.id}` })
   const rem = student.totalLessons - student.completedLessons
@@ -506,36 +531,7 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   }
 
   if (lesson?.student) {
-    const rem = lesson.student.totalLessons - lesson.student.completedLessons
-    return (
-      <div ref={setNodeRef} className={`time-slot occupied ${!lesson.made ? 'not-made' : ''}`}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <span className="slot-time">{time} - {endTimeStr}</span>
-          {lesson.student.instrument && <span className="tag tag-instrument" style={{ fontSize: 8, padding: '1px 4px' }}>{lesson.student.instrument}</span>}
-        </div>
-        <div className="slot-student">
-          <span className="slot-name">{lesson.student.name}</span>
-          {rem <= 2 && lesson.student.totalLessons > 0 && (
-            <span style={{ fontSize: 9, color: 'var(--red)' }}>⚠️</span>
-          )}
-          {lesson.student.notes && (
-            <span title={lesson.student.notes} style={{ fontSize: 9, cursor: 'help' }}>📝</span>
-          )}
-        </div>
-        {!lesson.made && <span className="not-made-label">Not Made</span>}
-        <div className="slot-actions">
-          <button
-            className={`btn btn-sm ${lesson.made ? 'btn-ghost' : 'btn-danger'}`}
-            onClick={() => onToggleAttendance(lesson.id)}
-            title={lesson.made ? 'Mark as not made' : 'Mark as made'}
-            style={{ padding: '2px 6px', fontSize: 10 }}
-          >
-            {lesson.made ? '✓' : '✗'}
-          </button>
-          <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
-        </div>
-      </div>
-    )
+    return <DraggableOccupiedSlot setDropRef={setNodeRef} lesson={lesson} time={time} endTimeStr={endTimeStr} onRemove={onRemove} onToggleAttendance={onToggleAttendance} />
   }
 
   return (
@@ -547,3 +543,50 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   )
 }
 
+function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance }: {
+  setDropRef: (el: HTMLElement | null) => void
+  lesson: Lesson
+  time: string
+  endTimeStr: string
+  onRemove: (id: number) => void
+  onToggleAttendance: (id: number) => void
+}) {
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: `lesson-${lesson.id}` })
+  const rem = (lesson.student?.totalLessons || 0) - (lesson.student?.completedLessons || 0)
+
+  return (
+    <div
+      ref={(node) => { setDropRef(node); setDragRef(node); }}
+      className={`time-slot occupied ${!lesson.made ? 'not-made' : ''} ${isDragging ? 'dragging' : ''}`}
+      style={{ cursor: 'grab', ...(isDragging ? { opacity: 0.4 } : {}) }}
+      {...listeners}
+      {...attributes}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <span className="slot-time">{time} - {endTimeStr}</span>
+        {lesson.student?.instrument && <span className="tag tag-instrument" style={{ fontSize: 8, padding: '1px 4px' }}>{lesson.student.instrument}</span>}
+      </div>
+      <div className="slot-student">
+        <span className="slot-name">{lesson.student?.name}</span>
+        {rem <= 2 && (lesson.student?.totalLessons || 0) > 0 && (
+          <span style={{ fontSize: 9, color: 'var(--red)' }}>⚠️</span>
+        )}
+        {lesson.student?.notes && (
+          <span title={lesson.student.notes} style={{ fontSize: 9, cursor: 'help' }}>📝</span>
+        )}
+      </div>
+      {!lesson.made && <span className="not-made-label">Not Made</span>}
+      <div className="slot-actions">
+        <button
+          className={`btn btn-sm ${lesson.made ? 'btn-ghost' : 'btn-danger'}`}
+          onClick={() => onToggleAttendance(lesson.id)}
+          title={lesson.made ? 'Mark as not made' : 'Mark as made'}
+          style={{ padding: '2px 6px', fontSize: 10 }}
+        >
+          {lesson.made ? '✓' : '✗'}
+        </button>
+        <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
+      </div>
+    </div>
+  )
+}
