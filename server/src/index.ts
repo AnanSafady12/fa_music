@@ -7,6 +7,7 @@ import schedulesRouter from './routes/schedules'
 import lessonsRouter from './routes/lessons'
 import summaryRouter from './routes/summary'
 import workerRouter from './routes/worker'
+import todosRouter from './routes/todos'
 import authRouter from './routes/auth'
 import { authMiddleware } from './middleware/authMiddleware'
 import { startCronJobs } from './cron'
@@ -30,6 +31,7 @@ app.use('/api/schedules', authMiddleware, schedulesRouter)
 app.use('/api/lessons', authMiddleware, lessonsRouter)
 app.use('/api/summary', authMiddleware, summaryRouter)
 app.use('/api/worker', authMiddleware, workerRouter)
+app.use('/api/todos', authMiddleware, todosRouter)
 
 // Automatically process lessons whose end time has passed
 startCronJobs()

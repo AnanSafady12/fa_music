@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { Student } from '../types'
 import { INSTRUMENTS, PACKAGES } from '../types'
 import { getStudents, createStudent, updateStudent, deleteStudent, getStudentHistory } from '../api'
@@ -21,10 +22,25 @@ export default function StudentsPage() {
   const [history, setHistory] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const highlightId = searchParams.get('highlightId')
+  const rowRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({})
+
   const load = async () => {
     try { setStudents(await getStudents()) } catch {} finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (highlightId && students.length > 0) {
+      const id = Number(highlightId)
+      if (rowRefs.current[id]) {
+        rowRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Optional: Remove highlight param after scrolling so it doesn't re-trigger on refresh
+        setTimeout(() => setSearchParams({}), 3000)
+      }
+    }
+  }, [highlightId, students, setSearchParams])
 
   const openAdd = () => { setEditing(null); setForm(emptyForm); setModalOpen(true) }
   const openEdit = (s: Student) => {
@@ -189,8 +205,10 @@ export default function StudentsPage() {
                   return (
                     <tr 
                       key={s.id} 
+                      ref={el => { rowRefs.current[s.id] = el }}
                       onDoubleClick={() => openHistory(s)} 
-                      style={{ cursor: 'pointer' }}
+                      style={{ cursor: 'pointer', transition: 'background-color 1s' }}
+                      className={Number(highlightId) === s.id ? 'highlight-row' : ''}
                       title="Double-click to view history"
                     >
                       <td>

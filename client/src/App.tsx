@@ -7,6 +7,7 @@ import SchedulePage from './pages/SchedulePage'
 import ExportPage from './pages/ExportPage'
 import DatabasePage from './pages/DatabasePage'
 import LoginPage from './pages/LoginPage'
+import FloatingTodoWidget from './components/FloatingTodoWidget'
 import './index.css'
 import './App.css'
 
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
+          <FloatingTodoWidget />
         </div>
       ) : (
         <Routes>

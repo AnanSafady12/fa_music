@@ -35,6 +35,7 @@ model Student {
   notes            String?
   registrationDate DateTime   @default(now())
   lessons          Lesson[]
+  todos            Todo[]
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 }
@@ -108,5 +109,15 @@ model Lesson {
   breakLabel String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Todo {
+  id          Int      @id @default(autoincrement())
+  text        String
+  isCompleted Boolean  @default(false)
+  student     Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  studentId   Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 

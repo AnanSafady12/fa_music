@@ -20,6 +20,24 @@ export interface Student {
   updatedAt: string
 }
 
+export interface MonthlyTeacherStats {
+  id: number;
+  teacherId: number;
+  month: number;
+  year: number;
+  notes: string | null;
+  manualSalary: number | null;
+}
+
+export interface Todo {
+  id: number;
+  text: string;
+  isCompleted: boolean;
+  studentId: number | null;
+  student?: Student;
+  createdAt: string;
+}
+
 export interface Teacher {
   id: number
   name: string

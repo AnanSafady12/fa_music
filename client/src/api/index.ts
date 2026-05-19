@@ -32,3 +32,8 @@ export const updateTeacherStats = (data: { teacherId: number, month: number, yea
 
 export const getWorker = () => api.get('/worker').then(r => r.data)
 export const updateWorker = (data: any) => api.put('/worker', data).then(r => r.data)
+
+export const getTodos = () => api.get('/todos').then(r => r.data)
+export const createTodo = (data: { text: string, studentId?: number | null }) => api.post('/todos', data).then(r => r.data)
+export const updateTodo = (id: number, data: { text?: string, isCompleted?: boolean }) => api.put(`/todos/${id}`, data).then(r => r.data)
+export const deleteTodo = (id: number) => api.delete(`/todos/${id}`).then(r => r.data)
