@@ -106,7 +106,8 @@ export default function SchedulePage() {
     if (!room) return
 
     const existingLesson = room.lessons.find(l => l.startTime === time)
-    if (existingLesson) return
+    // Only block if slot has a different student or is a break
+    if (existingLesson && (existingLesson.isBreak || (existingLesson.studentId && existingLesson.studentId !== studentId))) return
 
     let fromLesson: Lesson | null = null
     for (const r of schedule.rooms) {
