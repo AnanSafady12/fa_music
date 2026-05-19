@@ -4,6 +4,7 @@
 }
 
 .widget-fab {
+  position: relative !important;
   width: 50px;
   height: 50px;
   border-radius: 25px;
@@ -11,9 +12,7 @@
   color: #000;
   border: none !important;
   font-size: 24px;
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
+  display: block !important;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   transition: transform 0.2s;
@@ -26,7 +25,11 @@
 }
 
 .fab-icon {
-  filter: grayscale(100%) brightness(0.2) contrast(1.5);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  filter: grayscale(100%) brightness(0.5) contrast(1.2);
 }
 
 .widget-panel {
