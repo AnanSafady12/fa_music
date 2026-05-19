@@ -497,7 +497,7 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
 
   if (lesson?.isBreak) {
     return (
-      <div className="time-slot break-slot">
+      <div ref={setNodeRef} className="time-slot break-slot">
         <span className="slot-time">{time} - {endTimeStr}</span>
         <span className="break-label">☕ {lesson.breakLabel || 'Break'} <span style={{opacity: 0.6, fontSize: 10}}>({duration}m)</span></span>
         <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
@@ -508,7 +508,7 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   if (lesson?.student) {
     const rem = lesson.student.totalLessons - lesson.student.completedLessons
     return (
-      <div className={`time-slot occupied ${!lesson.made ? 'not-made' : ''}`}>
+      <div ref={setNodeRef} className={`time-slot occupied ${!lesson.made ? 'not-made' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <span className="slot-time">{time} - {endTimeStr}</span>
           {lesson.student.instrument && <span className="tag tag-instrument" style={{ fontSize: 8, padding: '1px 4px' }}>{lesson.student.instrument}</span>}
