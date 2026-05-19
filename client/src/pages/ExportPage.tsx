@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, createRef } from 'react'
 import html2canvas from 'html2canvas'
 import { saveAs } from 'file-saver'
-import type { Schedule } from '../types'
+import type { Schedule, Room } from '../types'
 import { getSchedules } from '../api'
 import './ExportPage.css'
 
@@ -9,12 +9,13 @@ export default function ExportPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [schedule, setSchedule] = useState<Schedule | null>(null)
-  const [exporting, setExporting] = useState(false)
-  const [exportResult, setExportResult] = useState<string | null>(null)
-  const previewRef = useRef<HTMLDivElement>(null)
+  const [exporting, setExporting] = useState<Record<number, boolean>>({})
+  const [exportResults, setExportResults] = useState<Record<number, string>>({})
+  const [exportingAll, setExportingAll] = useState(false)
+  const roomRefs = useRef<Record<number, React.RefObject<HTMLDivElement>>>({})
 
   useEffect(() => {
-    setExportResult(null)
+    setExportResults({})
   }, [selectedId, schedule])
 
   useEffect(() => {
@@ -30,28 +31,61 @@ export default function ExportPage() {
     setSchedule(s)
   }, [selectedId, schedules])
 
-  const handleExport = async () => {
-    if (!previewRef.current) return
-    setExporting(true)
+  // Create refs for each room
+  useEffect(() => {
+    if (!schedule) return
+    const refs: Record<number, React.RefObject<HTMLDivElement>> = {}
+    schedule.rooms.forEach(room => {
+      refs[room.id] = roomRefs.current[room.id] || createRef<HTMLDivElement>()
+    })
+    roomRefs.current = refs
+  }, [schedule])
+
+  const captureRoom = async (room: Room): Promise<{ dataUrl: string; blob: Blob | null }> => {
+    const ref = roomRefs.current[room.id]
+    if (!ref?.current) return { dataUrl: '', blob: null }
+
+    const canvas = await html2canvas(ref.current, {
+      scale: 3,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+    })
+    const dataUrl = canvas.toDataURL('image/png')
+    const blob = await new Promise<Blob | null>(resolve => {
+      canvas.toBlob(b => resolve(b), 'image/png')
+    })
+    return { dataUrl, blob }
+  }
+
+  const handleExportRoom = async (room: Room) => {
+    setExporting(prev => ({ ...prev, [room.id]: true }))
     try {
-      const canvas = await html2canvas(previewRef.current, {
-        scale: 3,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
-      })
-      const dataUrl = canvas.toDataURL('image/png')
-      setExportResult(dataUrl)
-      
-      // Still attempt standard download for compatible browsers
-      try {
-        const filename = `FA-Music-Schedule-${schedule?.date?.split('T')[0] || 'export'}.png`
-        canvas.toBlob((b) => { if(b) saveAs(b, filename) }, 'image/png')
-      } catch {}
+      const { dataUrl, blob } = await captureRoom(room)
+      setExportResults(prev => ({ ...prev, [room.id]: dataUrl }))
+      if (blob) {
+        const dateStr = schedule?.date?.split('T')[0] || 'export'
+        const filename = `FA-Music-${room.name}-${dateStr}.png`
+        saveAs(blob, filename)
+      }
     } catch {
       // ignore
     } finally {
-      setExporting(false)
+      setExporting(prev => ({ ...prev, [room.id]: false }))
+    }
+  }
+
+  const handleExportAll = async () => {
+    if (!schedule) return
+    setExportingAll(true)
+    try {
+      for (const room of schedule.rooms) {
+        await handleExportRoom(room)
+        // Small delay between exports so browser can handle downloads
+        await new Promise(r => setTimeout(r, 300))
+      }
+    } finally {
+      setExportingAll(false)
     }
   }
 
@@ -60,12 +94,14 @@ export default function ExportPage() {
     catch { return d }
   }
 
+  const allExported = schedule ? schedule.rooms.every(r => !!exportResults[r.id]) : false
+
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <div className="page-title">Export Schedule</div>
-          <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>Generate WhatsApp-ready PNG image</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>Generate WhatsApp-ready PNG — one image per room</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <select
@@ -83,10 +119,10 @@ export default function ExportPage() {
           </select>
           <button
             className="btn btn-primary"
-            onClick={handleExport}
-            disabled={!schedule || exporting || !!exportResult}
+            onClick={handleExportAll}
+            disabled={!schedule || exportingAll || allExported}
           >
-            {exporting ? '⏳ Generating...' : exportResult ? '✅ Ready!' : '🖼️ Generate PNG'}
+            {exportingAll ? '⏳ Generating All...' : allExported ? '✅ All Done!' : '🖼️ Export All Rooms'}
           </button>
         </div>
       </div>
@@ -98,24 +134,37 @@ export default function ExportPage() {
             <p>Create a schedule first, then return here to export.</p>
           </div>
         ) : (
-          <div className="export-wrapper">
-            <div className="export-preview-card">
-              {/* The template that gets captured */}
-              <div ref={previewRef} className="export-template">
-                {/* Header */}
-                <div className="export-header">
-                  <img src="/fa-logo.jpg" alt="FA Music Logo" className="export-logo" style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '4px', background: 'transparent' }} />
-                  <div>
-                    <h1 className="export-institute">FA Music Institute</h1>
-                    <div className="export-date-line">
-                      {schedule.dayName} &nbsp;·&nbsp; {formatDate(schedule.date)}
-                    </div>
-                  </div>
+          <div className="export-rooms-grid">
+            {schedule.rooms.map(room => (
+              <div className="export-room-card" key={room.id}>
+                {/* Individual room export button */}
+                <div className="export-room-actions">
+                  <span className="export-room-label">{room.name}</span>
+                  <button
+                    className={`btn ${exportResults[room.id] ? 'btn-success' : 'btn-primary'} btn-sm`}
+                    onClick={() => handleExportRoom(room)}
+                    disabled={exporting[room.id] || !!exportResults[room.id]}
+                  >
+                    {exporting[room.id] ? '⏳...' : exportResults[room.id] ? '✅ Done' : '📥 Export'}
+                  </button>
                 </div>
 
-                <div className="export-rooms">
-                  {schedule.rooms.map(room => (
-                    <div className="export-room" key={room.id}>
+                {/* The template that gets captured — one per room */}
+                <div ref={roomRefs.current[room.id]} className="export-template">
+                  {/* Header */}
+                  <div className="export-header">
+                    <img src="/fa-logo.jpg" alt="FA Music Logo" className="export-logo" style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '4px', background: 'transparent' }} />
+                    <div>
+                      <h1 className="export-institute">FA Music Institute</h1>
+                      <div className="export-date-line">
+                        {schedule.dayName} &nbsp;·&nbsp; {formatDate(schedule.date)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Single room content */}
+                  <div className="export-single-room">
+                    <div className="export-room">
                       <div className="export-room-title">{room.name}</div>
                       <table className="export-table">
                         <thead>
@@ -143,31 +192,22 @@ export default function ExportPage() {
                         </tbody>
                       </table>
                     </div>
-                  ))}
-                </div>
-
-                <div className="export-footer">FA Music Institute · Schedule</div>
-              </div>
-
-              {exportResult && (
-                <div className="export-result-overlay">
-                  <div className="export-result-message">
-                    <h3>✅ Image Generated Successfully!</h3>
-                    <p>Your browser blocked the automatic download filename.</p>
-                    <p style={{ marginTop: 8 }}>
-                      <strong>Mac/PC:</strong> Right-click and select "Save Image As..."
-                    </p>
-                    <p>
-                      <strong>Mobile:</strong> Long-press and select "Save to Photos" or "Share".
-                    </p>
-                    <button className="btn btn-secondary" onClick={() => setExportResult(null)} style={{ marginTop: 12 }}>
-                      Close & Edit
-                    </button>
                   </div>
-                  <img src={exportResult} alt="Schedule Export" className="export-result-img" />
+
+                  <div className="export-footer">FA Music Institute · {room.name}</div>
                 </div>
-              )}
-            </div>
+
+                {/* Show generated image inline if exported */}
+                {exportResults[room.id] && (
+                  <div className="export-result-inline">
+                    <p className="export-result-hint">
+                      📱 <strong>Mobile:</strong> Long-press image → Save to Photos
+                    </p>
+                    <img src={exportResults[room.id]} alt={`${room.name} Export`} className="export-result-img-inline" />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
