@@ -118,6 +118,11 @@ export default function SchedulePage() {
     setSaving(true)
     const newEnd = minsToTime(timeToMins(time) + 45)
     try {
+      // Clean up ghost lesson (no student assigned) before dropping the new one
+      if (existingLesson && !existingLesson.studentId && !existingLesson.isBreak) {
+        await deleteLesson(existingLesson.id)
+      }
+
       if (fromLesson) {
         await updateLesson(fromLesson.id, { roomId: room.id, studentId, startTime: time, endTime: newEnd, isBreak: false })
       } else {
