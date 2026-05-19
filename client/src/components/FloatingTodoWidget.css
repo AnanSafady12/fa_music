@@ -153,16 +153,40 @@
 .mention-wrapper {
   position: relative;
   flex: 1;
+  display: flex;
+  align-items: center;
 }
 
 .todo-input {
   width: 100%;
-  padding: 8px 12px;
+  padding: 8px 32px 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-900);
   color: var(--text-primary);
   font-size: 13px;
+}
+
+.insert-mention-btn {
+  position: absolute;
+  right: 6px;
+  background: var(--bg-700);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--accent);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.insert-mention-btn:hover {
+  background: var(--bg-600);
 }
 
 .mention-dropdown {

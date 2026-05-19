@@ -78,6 +78,15 @@ export default function FloatingTodoWidget() {
     inputRef.current?.focus()
   }
 
+  const insertMention = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const newText = text + (text.length > 0 && !text.endsWith(' ') ? ' @' : '@')
+    setText(newText)
+    setMentionFilter('')
+    setShowMentions(true)
+    inputRef.current?.focus()
+  }
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!text.trim()) return
@@ -183,9 +192,11 @@ export default function FloatingTodoWidget() {
                     type="text"
                     value={text}
                     onChange={handleTextChange}
-                    placeholder="Add task... (type @ for student)"
+                    placeholder="Add task..."
                     className="todo-input"
+                    dir="auto"
                   />
+                  <button type="button" className="insert-mention-btn" onClick={insertMention} title="Mention student">@</button>
                   {showMentions && filteredStudents.length > 0 && (
                     <div className="mention-dropdown">
                       {filteredStudents.map(s => (
