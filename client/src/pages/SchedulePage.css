@@ -185,6 +185,14 @@
   background: var(--bg-600);
 }
 
+@media (pointer: coarse) or (max-width: 1200px) {
+  .room-slots {
+    max-height: 300px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 @media (max-width: 1024px) {
   .rooms-panel {
     grid-template-columns: repeat(2, 1fr);
