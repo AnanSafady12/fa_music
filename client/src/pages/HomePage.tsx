@@ -75,7 +75,7 @@ export default function HomePage() {
 
   return (
     <div className="home-page">
-      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2.5rem' }}>
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem', marginBottom: '2.5rem' }}>
         <div>
           <h1 style={{ margin: 0 }}>Institute Overview</h1>
           <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)' }}>Viewing stats for {MONTHS[selectedMonth - 1]} {selectedYear}</p>
@@ -95,7 +95,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <div className="metrics-grid">
         <div className="metric-card">
           <div className="metric-title">Total Students</div>
           <div className="metric-value">
