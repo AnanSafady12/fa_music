@@ -20,6 +20,7 @@ export default function FloatingTodoWidget() {
   const nodeRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const navigate = useNavigate()
+  const dragStart = useRef({ x: 0, y: 0 })
 
   useEffect(() => {
     loadTodos()
@@ -143,18 +144,32 @@ export default function FloatingTodoWidget() {
 
   const filteredStudents = students.filter(s => s.name.toLowerCase().includes(mentionFilter)).slice(0, 5)
 
-  const handleOpen = () => {
-    if (!isDragging.current) setIsOpen(true)
+  const handleStart = (_e: any, data: any) => {
+    dragStart.current = { x: data.x, y: data.y }
   }
+
+  const handleStop = (_e: any, data: any) => {
+    const dist = Math.hypot(data.x - dragStart.current.x, data.y - dragStart.current.y)
+    if (dist < 6) {
+      if (!isOpen) {
+        setIsOpen(true)
+      }
+    }
+    setTimeout(() => { isDragging.current = false }, 100)
+  }
+
+  const defaultX = window.innerWidth < 450 ? 10 : window.innerWidth - 350
+  const defaultY = window.innerHeight < 600 ? 50 : window.innerHeight - 500
 
   return (
     <Draggable 
       nodeRef={nodeRef} 
       handle=".widget-handle" 
       bounds="body" 
-      defaultPosition={{x: window.innerWidth - 350, y: window.innerHeight - 500}}
+      defaultPosition={{x: defaultX, y: defaultY}}
+      onStart={handleStart}
       onDrag={() => { isDragging.current = true }}
-      onStop={() => { setTimeout(() => { isDragging.current = false }, 100) }}
+      onStop={handleStop}
     >
       <div ref={nodeRef} className="floating-widget-container">
         {isOpen && (
@@ -215,7 +230,7 @@ export default function FloatingTodoWidget() {
         )}
         
         {!isOpen && (
-          <button className="widget-fab widget-handle" onClick={handleOpen}>
+          <button className="widget-fab widget-handle">
             <span className="fab-icon">📋</span>
           </button>
         )}

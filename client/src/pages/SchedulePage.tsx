@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
+import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core'
 
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { INSTRUMENTS, PACKAGES, timeToMins, minsToTime, DAY_NAMES } from '../types'
@@ -66,9 +66,23 @@ export default function SchedulePage() {
     loadSchedule(selectedDate)
   }, [selectedDate, loadSchedule])
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: {
+      distance: 5,
+    },
+  })
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 250,
+      tolerance: 8,
+    },
+  })
+  const sensors = useSensors(mouseSensor, touchSensor)
 
   const handleDragStart = (e: DragStartEvent) => {
+    if (navigator.vibrate) {
+      navigator.vibrate(50)
+    }
     const activeId = String(e.active.id)
     if (activeId.startsWith('student-')) {
       const student = students.find(s => `student-${s.id}` === activeId)

@@ -51,3 +51,33 @@
   color: var(--accent-light);
   font-weight: 600;
 }
+
+@media (max-width: 900px) {
+  .navbar {
+    flex-direction: column;
+    height: auto;
+    padding: 12px 16px;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .navbar-brand {
+    margin-right: 0;
+    justify-content: center;
+  }
+  .navbar-links {
+    overflow-x: auto;
+    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+  }
+  .navbar-links::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+  .nav-link {
+    flex-shrink: 0;
+  }
+}
+

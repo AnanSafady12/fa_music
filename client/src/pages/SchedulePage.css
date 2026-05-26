@@ -59,6 +59,7 @@
   cursor: grab;
   transition: all 0.15s;
   user-select: none;
+  touch-action: pan-y;
 }
 .student-card:hover { border-color: var(--accent); background: var(--bg-500); }
 .student-card.dragging { opacity: 0.5; }
@@ -116,7 +117,7 @@
 .break-btn { margin-left: auto; padding: 2px 5px; background: transparent; border: none; opacity: 0; cursor: pointer; font-size: 12px; transition: opacity 0.15s; }
 .time-slot.empty:hover .break-btn { opacity: 1; }
 
-.time-slot.occupied { background: var(--bg-500); border: 1px solid rgba(108,99,255,0.2); }
+.time-slot.occupied { background: var(--bg-500); border: 1px solid rgba(108,99,255,0.2); touch-action: pan-y; }
 .time-slot.occupied:hover { border-color: var(--accent); }
 .time-slot.not-made { background: rgba(255,77,109,0.1); border-color: rgba(255,77,109,0.3) !important; }
 .slot-student { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; }
@@ -180,3 +181,34 @@
   margin-bottom: 6px;
   background: var(--bg-600);
 }
+
+@media (max-width: 1024px) {
+  .rooms-panel {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .schedule-page {
+    height: auto;
+    min-height: calc(100vh - 120px);
+    overflow: visible;
+  }
+  .schedule-body {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .student-panel {
+    width: 100%;
+    height: 250px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .rooms-panel {
+    grid-template-columns: 1fr;
+    overflow: visible;
+    padding: 8px;
+  }
+}
+
