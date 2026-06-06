@@ -3,6 +3,16 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+function timeToMins(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function getLessonMultiplier(startTime: string, endTime: string) {
+  const duration = timeToMins(endTime) - timeToMins(startTime);
+  return duration === 25 ? 0.5 : 1.0;
+}
+
 // Run every minute
 export function startCronJobs() {
   cron.schedule('* * * * *', async () => {
@@ -53,10 +63,11 @@ export function startCronJobs() {
             })
 
             if (lesson.studentId) {
+              const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
               await tx.student.update({
                 where: { id: lesson.studentId },
                 data: {
-                  completedLessons: { increment: 1 }
+                  completedLessons: { increment: multiplier }
                 }
               })
             }

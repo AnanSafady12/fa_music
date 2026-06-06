@@ -4,6 +4,16 @@ import { PrismaClient } from '@prisma/client'
 const router = Router()
 const prisma = new PrismaClient()
 
+function timeToMins(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function getLessonMultiplier(startTime: string, endTime: string) {
+  const duration = timeToMins(endTime) - timeToMins(startTime);
+  return duration === 25 ? 0.5 : 1.0;
+}
+
 // GET summary
 router.get('/', async (req, res) => {
   try {
@@ -79,7 +89,8 @@ router.get('/', async (req, res) => {
     for (const lesson of processedLessons) {
       const instr = lesson.student?.instrument
       if (instr) {
-        instrumentLessonCounts[instr] = (instrumentLessonCounts[instr] || 0) + 1
+        const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
+        instrumentLessonCounts[instr] = (instrumentLessonCounts[instr] || 0) + multiplier
       }
     }
 

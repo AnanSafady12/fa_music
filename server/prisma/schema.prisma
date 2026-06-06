@@ -29,7 +29,7 @@ model Student {
   age              Int?
   instrument       Instrument?
   totalLessons     Int        @default(0)
-  completedLessons Int        @default(0)
+  completedLessons Float      @default(0)
   hasPaid          Boolean    @default(false)
   amountPaid       Float      @default(0)
   paidPacks        String     @default("")

@@ -16,6 +16,10 @@ function minsToTime(mins: number) {
 function addMins(t: string, mins: number) {
   return minsToTime(timeToMins(t) + mins);
 }
+function getLessonMultiplier(startTime: string, endTime: string) {
+  const duration = timeToMins(endTime) - timeToMins(startTime);
+  return duration === 25 ? 0.5 : 1.0;
+}
 
 // POST create a lesson in a room
 router.post('/', async (req, res) => {
@@ -62,9 +66,10 @@ router.post('/', async (req, res) => {
       })
 
       if (shouldProcess && studentId) {
+        const multiplier = getLessonMultiplier(startTime, endTime)
         await tx.student.update({
           where: { id: studentId },
-          data: { completedLessons: { increment: 1 } }
+          data: { completedLessons: { increment: multiplier } }
         })
       }
       return l
@@ -121,13 +126,49 @@ router.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
     const { roomId, studentId, startTime, endTime, isBreak, breakLabel } = req.body
-    const lesson = await prisma.lesson.update({
-      where: { id },
-      data: { roomId, studentId: studentId || null, startTime, endTime, isBreak, breakLabel },
-      include: { student: true }
+
+    const oldLesson = await prisma.lesson.findUnique({ where: { id } })
+    if (!oldLesson) return res.status(404).json({ error: 'Lesson not found' })
+
+    const lesson = await prisma.$transaction(async (tx) => {
+      const l = await tx.lesson.update({
+        where: { id },
+        data: { roomId, studentId: studentId || null, startTime, endTime, isBreak, breakLabel },
+        include: { student: true }
+      })
+
+      if (oldLesson.isProcessed && oldLesson.made) {
+        const oldMult = getLessonMultiplier(oldLesson.startTime, oldLesson.endTime)
+        const newMult = getLessonMultiplier(startTime, endTime)
+
+        // If student changed
+        if (oldLesson.studentId !== (studentId || null)) {
+          if (oldLesson.studentId) {
+            await tx.student.update({
+              where: { id: oldLesson.studentId },
+              data: { completedLessons: { decrement: oldMult } }
+            })
+          }
+          if (studentId) {
+            await tx.student.update({
+              where: { id: studentId },
+              data: { completedLessons: { increment: newMult } }
+            })
+          }
+        } else if (studentId && oldMult !== newMult) {
+          // Same student, but duration changed
+          await tx.student.update({
+            where: { id: studentId },
+            data: { completedLessons: { increment: newMult - oldMult } }
+          })
+        }
+      }
+      return l
     })
+
     res.json(lesson)
-  } catch {
+  } catch (err) {
+    console.error(err)
     res.status(500).json({ error: 'Failed to update lesson' })
   }
 })
@@ -159,15 +200,16 @@ router.patch('/:id/attendance', async (req, res) => {
     const willBeMade = !lesson.made
     let increment = 0
     let setProcessed = lesson.isProcessed
+    const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
 
     // Logic:
     // If moving from Made -> Not Made AND isProcessed: DECREMENT, set isProcessed = false
     // If moving from Not Made -> Made AND isPast: INCREMENT, set isProcessed = true
     if (lesson.made && !willBeMade && lesson.isProcessed) {
-      increment = -1
+      increment = -multiplier
       setProcessed = false
     } else if (!lesson.made && willBeMade && isPast && !lesson.isProcessed) {
-      increment = 1
+      increment = multiplier
       setProcessed = true
     }
 
@@ -201,9 +243,10 @@ router.delete('/:id', async (req, res) => {
 
     await prisma.$transaction(async (tx) => {
       if (lesson.isProcessed && lesson.made && lesson.studentId) {
+        const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
         await tx.student.update({
           where: { id: lesson.studentId },
-          data: { completedLessons: { increment: -1 } }
+          data: { completedLessons: { increment: -multiplier } }
         })
       }
       await tx.lesson.delete({ where: { id } })
