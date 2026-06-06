@@ -99,7 +99,15 @@
   justify-content: space-between;
 }
 .room-name { font-weight: 700; font-size: 13px; letter-spacing: 0.02em; }
-.room-slots { padding: 6px; display: flex; flex-direction: column; gap: 3px; }
+.room-slots {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 /* Time slots */
 .time-slot {
@@ -188,8 +196,6 @@
 @media (pointer: coarse) or (max-width: 1200px) {
   .room-slots {
     max-height: 300px;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
   }
 }
 
