@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSummary, updateTeacherStats, updateWorker, getWorkerLogs, createWorkerLog, deleteWorkerLog } from '../api'
+import { getSummary, updateTeacherStats, updateWorker, getWorkerLogs, createWorkerLog, updateWorkerLog, deleteWorkerLog } from '../api'
 import './HomePage.css'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -21,6 +21,15 @@ export default function HomePage() {
   const [newLogForm, setNewLogForm] = useState({
     date: new Date().toISOString().split('T')[0],
     hours: '',
+    notes: ''
+  })
+
+  // Local state for editing individual log rows
+  const [editingLogId, setEditingLogId] = useState<number | null>(null)
+  const [editingLogForm, setEditingLogForm] = useState({
+    date: '',
+    hours: '',
+    costPerHour: '',
     notes: ''
   })
 
@@ -75,6 +84,32 @@ export default function HomePage() {
     if (!confirm('Are you sure you want to delete this log?')) return
     try {
       await deleteWorkerLog(logId)
+      load()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const startEditLog = (log: any) => {
+    setEditingLogId(log.id)
+    setEditingLogForm({
+      date: log.date.split('T')[0],
+      hours: String(log.hours),
+      costPerHour: String(log.costPerHour),
+      notes: log.notes || ''
+    })
+  }
+
+  const saveLogEdit = async (logId: number) => {
+    if (!editingLogForm.date || !editingLogForm.hours || !editingLogForm.costPerHour) return
+    try {
+      await updateWorkerLog(logId, {
+        date: editingLogForm.date,
+        hours: Number(editingLogForm.hours),
+        costPerHour: Number(editingLogForm.costPerHour),
+        notes: editingLogForm.notes
+      })
+      setEditingLogId(null)
       load()
     } catch (err) {
       console.error(err)
@@ -341,19 +376,78 @@ export default function HomePage() {
               </thead>
               <tbody>
                 {logs.map((log: any) => {
+                  const isEditingThisRow = editingLogId === log.id
                   const logDate = new Date(log.date)
                   const weekday = logDate.toLocaleDateString('en-US', { weekday: 'long' })
                   const dateStr = logDate.toLocaleDateString('en-GB')
                   return (
                     <tr key={log.id}>
-                      <td style={{ fontWeight: 600 }}>{weekday}, {dateStr}</td>
-                      <td>{log.hours} hrs</td>
-                      <td style={{ color: 'var(--text-muted)' }}>₪{log.costPerHour}</td>
-                      <td style={{ color: 'var(--gold)', fontWeight: 600 }}>₪{(log.hours * log.costPerHour).toLocaleString()}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{log.notes || '—'}</td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button className="btn btn-danger btn-sm btn-icon" onClick={() => handleDeleteLog(log.id)}>🗑️</button>
-                      </td>
+                      {isEditingThisRow ? (
+                        <>
+                          <td>
+                            <input 
+                              type="date" 
+                              className="input" 
+                              style={{ padding: '4px 8px', fontSize: 13, height: 32 }}
+                              value={editingLogForm.date}
+                              onChange={e => setEditingLogForm(f => ({ ...f, date: e.target.value }))}
+                            />
+                          </td>
+                          <td>
+                            <input 
+                              type="number" 
+                              step="0.1"
+                              min="0"
+                              className="input" 
+                              style={{ width: 80, padding: '4px 8px', fontSize: 13, height: 32 }}
+                              value={editingLogForm.hours}
+                              onChange={e => setEditingLogForm(f => ({ ...f, hours: e.target.value }))}
+                            />
+                          </td>
+                          <td>
+                            <input 
+                              type="number" 
+                              className="input" 
+                              style={{ width: 80, padding: '4px 8px', fontSize: 13, height: 32 }}
+                              value={editingLogForm.costPerHour}
+                              onChange={e => setEditingLogForm(f => ({ ...f, costPerHour: e.target.value }))}
+                            />
+                          </td>
+                          <td style={{ color: 'var(--gold)', fontWeight: 600 }}>
+                            ₪{((Number(editingLogForm.hours) || 0) * (Number(editingLogForm.costPerHour) || 0)).toLocaleString()}
+                          </td>
+                          <td>
+                            <input 
+                              type="text" 
+                              className="input" 
+                              style={{ minWidth: 150, padding: '4px 8px', fontSize: 13, height: 32 }}
+                              value={editingLogForm.notes}
+                              onChange={e => setEditingLogForm(f => ({ ...f, notes: e.target.value }))}
+                              placeholder="Description..."
+                            />
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                              <button className="btn btn-primary btn-sm" onClick={() => saveLogEdit(log.id)}>Save</button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => setEditingLogId(null)}>Cancel</button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td style={{ fontWeight: 600 }}>{weekday}, {dateStr}</td>
+                          <td>{log.hours} hrs</td>
+                          <td style={{ color: 'var(--text-muted)' }}>₪{log.costPerHour}</td>
+                          <td style={{ color: 'var(--gold)', fontWeight: 600 }}>₪{(log.hours * log.costPerHour).toLocaleString()}</td>
+                          <td style={{ color: 'var(--text-secondary)' }}>{log.notes || '—'}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                              <button className="btn btn-ghost btn-sm" onClick={() => startEditLog(log)}>✏️</button>
+                              <button className="btn btn-danger btn-sm btn-icon" onClick={() => handleDeleteLog(log.id)}>🗑️</button>
+                            </div>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   )
                 })}

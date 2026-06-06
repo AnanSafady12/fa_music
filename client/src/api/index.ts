@@ -34,6 +34,7 @@ export const getWorker = () => api.get('/worker').then(r => r.data)
 export const updateWorker = (data: any) => api.put('/worker', data).then(r => r.data)
 export const getWorkerLogs = (month: number, year: number) => api.get('/worker/logs', { params: { month, year } }).then(r => r.data)
 export const createWorkerLog = (data: { date: string, hours: number, costPerHour: number, notes?: string }) => api.post('/worker/logs', data).then(r => r.data)
+export const updateWorkerLog = (id: number, data: { date: string, hours: number, costPerHour: number, notes?: string }) => api.put(`/worker/logs/${id}`, data).then(r => r.data)
 export const deleteWorkerLog = (id: number) => api.delete(`/worker/logs/${id}`).then(r => r.data)
 
 export const getTodos = () => api.get('/todos').then(r => r.data)

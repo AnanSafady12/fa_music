@@ -106,6 +106,27 @@ router.post('/logs', async (req, res) => {
   }
 })
 
+// PUT update worker log
+router.put('/logs/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const { date, hours, costPerHour, notes } = req.body
+    const log = await prisma.workerLog.update({
+      where: { id },
+      data: {
+        date: date ? new Date(date) : undefined,
+        hours: hours !== undefined ? Number(hours) : undefined,
+        costPerHour: costPerHour !== undefined ? Number(costPerHour) : undefined,
+        notes: notes !== undefined ? notes : undefined
+      }
+    })
+    res.json(log)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to update worker log' })
+  }
+})
+
 // DELETE worker log
 router.delete('/logs/:id', async (req, res) => {
   try {
