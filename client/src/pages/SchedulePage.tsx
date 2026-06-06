@@ -528,10 +528,9 @@ function DraggableStudentCard({ student, schedule }: { student: Student; schedul
   )
 }
 
-function generateRoomTimeline(dayName: string, lessons: Lesson[]) {
-  const isWeekend = ['Friday','Saturday'].includes(dayName)
-  const startMins = timeToMins(isWeekend ? '10:00' : '16:00')
-  const endMins = timeToMins(isWeekend ? '20:00' : '22:00')
+function generateRoomTimeline(_dayName: string, lessons: Lesson[]) {
+  const startMins = timeToMins('10:00')
+  const endMins = timeToMins('22:00')
   const SLOT_DURATION = 45
 
   const sortedLessons = [...lessons].sort((a, b) => timeToMins(a.startTime) - timeToMins(b.startTime))
