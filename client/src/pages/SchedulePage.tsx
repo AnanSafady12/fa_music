@@ -454,6 +454,7 @@ export default function SchedulePage() {
                   onRenameRoom={handleRenameRoom}
                   onEditDuration={(lesson) => setDurationModal({ lesson, duration: timeToMins(lesson.endTime) - timeToMins(lesson.startTime) })}
                   onEditTeacher={handleEditLessonTeacher}
+                  teachers={teachers}
                 />
               ))
             )}
@@ -749,7 +750,7 @@ function generateRoomTimeline(_dayName: string, lessons: Lesson[]) {
   return items
 }
 
-function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom, onEditDuration, onEditTeacher }: {
+function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom, onEditDuration, onEditTeacher, teachers }: {
   room: Room; roomIndex: number; dayName: string;
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
@@ -757,6 +758,7 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
   onRenameRoom: (id: number, name: string) => void
   onEditDuration: (lesson: Lesson) => void
   onEditTeacher: (lesson: Lesson) => void
+  teachers: Teacher[]
 }) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [tempName, setTempName] = useState(room.name)
@@ -792,6 +794,7 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
             onAddBreak={onAddBreak}
             onEditDuration={onEditDuration}
             onEditTeacher={onEditTeacher}
+            teachers={teachers}
           />
         ))}
       </div>
@@ -799,13 +802,14 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
   )
 }
 
-function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttendance, onAddBreak, onEditDuration, onEditTeacher }: {
+function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttendance, onAddBreak, onEditDuration, onEditTeacher, teachers }: {
   roomIndex: number; time: string; duration: number; lesson?: Lesson
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
   onAddBreak: (time: string) => void
   onEditDuration: (lesson: Lesson) => void
   onEditTeacher: (lesson: Lesson) => void
+  teachers: Teacher[]
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `${roomIndex}::${time}` })
   const endTimeStr = minsToTime(timeToMins(time) + duration)
@@ -831,6 +835,7 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
         onToggleAttendance={onToggleAttendance}
         onEditDuration={onEditDuration}
         onEditTeacher={onEditTeacher}
+        teachers={teachers}
       />
     )
   }
@@ -844,7 +849,7 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   )
 }
 
-function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance, onEditDuration, onEditTeacher }: {
+function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance, onEditDuration, onEditTeacher, teachers }: {
   setDropRef: (el: HTMLElement | null) => void
   lesson: Lesson
   time: string
@@ -853,6 +858,7 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
   onToggleAttendance: (id: number) => void
   onEditDuration: (lesson: Lesson) => void
   onEditTeacher: (lesson: Lesson) => void
+  teachers: Teacher[]
 }) {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: `lesson-${lesson.id}` })
   const rem = (lesson.student?.totalLessons || 0) - (lesson.student?.completedLessons || 0)
@@ -880,33 +886,39 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
           )}
         </div>
         
-        {lesson.student?.instrument && (
-          <div 
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              onEditTeacher(lesson)
-            }} 
-            style={{ 
-              fontSize: 9, 
-              color: 'var(--text-secondary)', 
-              cursor: 'pointer', 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '2px', 
-              background: 'var(--bg-600)', 
-              padding: '2px 6px', 
-              borderRadius: '4px', 
-              border: '1px solid var(--border)',
-              userSelect: 'none',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
-            title="Click to assign or change teacher"
-          >
-            🧑‍🏫 {lesson.teacher?.name || 'Assign Teacher'} ✏️
-          </div>
-        )}
+        {(() => {
+          if (!lesson.student?.instrument) return null
+          const matchingTeachers = teachers.filter(t => t.instrument === lesson.student?.instrument)
+          if (matchingTeachers.length <= 1) return null
+
+          return (
+            <div 
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onEditTeacher(lesson)
+              }} 
+              style={{ 
+                fontSize: 9, 
+                color: 'var(--text-secondary)', 
+                cursor: 'pointer', 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '2px', 
+                background: 'var(--bg-600)', 
+                padding: '2px 6px', 
+                borderRadius: '4px', 
+                border: '1px solid var(--border)',
+                userSelect: 'none',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+              title="Click to assign or change teacher"
+            >
+              🧑‍🏫 {lesson.teacher?.name || 'Assign Teacher'} ✏️
+            </div>
+          )
+        })()}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
         <div>
