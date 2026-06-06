@@ -73,6 +73,8 @@ export interface Lesson {
   roomId: number
   studentId?: number
   student?: Student
+  teacherId?: number
+  teacher?: Teacher
   startTime: string
   endTime: string
   made: boolean

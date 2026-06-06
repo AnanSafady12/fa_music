@@ -9,7 +9,7 @@ router.get('/', async (_req, res) => {
   try {
     const schedules = await prisma.schedule.findMany({
       orderBy: { date: 'asc' },
-      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true } } } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true, teacher: true } } } } }
     })
     res.json(schedules)
   } catch {
@@ -23,7 +23,7 @@ router.get('/:id', async (req, res) => {
     const id = Number(req.params.id)
     const schedule = await prisma.schedule.findUnique({
       where: { id },
-      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true, teacher: true }, orderBy: { startTime: 'asc' } } } } }
     })
     if (!schedule) return res.status(404).json({ error: 'Schedule not found' })
     res.json(schedule)
@@ -38,7 +38,7 @@ router.get('/by-date/:date', async (req, res) => {
     const date = new Date(req.params.date)
     const schedule = await prisma.schedule.findUnique({
       where: { date },
-      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true, teacher: true }, orderBy: { startTime: 'asc' } } } } }
     })
     if (!schedule) return res.status(404).json({ error: 'No schedule for this date' })
     res.json(schedule)
@@ -109,6 +109,7 @@ router.post('/:id/copy-last-week', async (req, res) => {
           data: {
             roomId: tgtRoom.id,
             studentId: lesson.studentId,
+            teacherId: lesson.teacherId,
             startTime: lesson.startTime,
             endTime: lesson.endTime,
             made: true,
@@ -121,7 +122,7 @@ router.post('/:id/copy-last-week', async (req, res) => {
 
     const result = await prisma.schedule.findUnique({
       where: { id: (target as any).id },
-      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true }, orderBy: { startTime: 'asc' } } } } }
+      include: { rooms: { orderBy: { id: 'asc' }, include: { lessons: { include: { student: true, teacher: true }, orderBy: { startTime: 'asc' } } } } }
     })
     res.json(result)
   } catch (e) {

@@ -24,7 +24,7 @@ function getLessonMultiplier(startTime: string, endTime: string) {
 // POST create a lesson in a room
 router.post('/', async (req, res) => {
   try {
-    const { roomId, studentId, startTime, endTime, isBreak, breakLabel } = req.body
+    const { roomId, studentId, teacherId, startTime, endTime, isBreak, breakLabel } = req.body
     
     // Fetch room/schedule to check date
     const room = await prisma.room.findUnique({
@@ -55,6 +55,7 @@ router.post('/', async (req, res) => {
         data: { 
           roomId, 
           studentId: studentId || null, 
+          teacherId: teacherId || null,
           startTime, 
           endTime, 
           isBreak: isBreak ?? false, 
@@ -62,7 +63,7 @@ router.post('/', async (req, res) => {
           isProcessed: shouldProcess,
           made: true 
         },
-        include: { student: true }
+        include: { student: true, teacher: true }
       })
 
       if (shouldProcess && studentId) {
@@ -125,7 +126,7 @@ router.post('/insert-break', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { roomId, studentId, startTime, endTime, isBreak, breakLabel } = req.body
+    const { roomId, studentId, teacherId, startTime, endTime, isBreak, breakLabel } = req.body
 
     const oldLesson = await prisma.lesson.findUnique({ where: { id } })
     if (!oldLesson) return res.status(404).json({ error: 'Lesson not found' })
@@ -133,8 +134,8 @@ router.put('/:id', async (req, res) => {
     const lesson = await prisma.$transaction(async (tx) => {
       const l = await tx.lesson.update({
         where: { id },
-        data: { roomId, studentId: studentId || null, startTime, endTime, isBreak, breakLabel },
-        include: { student: true }
+        data: { roomId, studentId: studentId || null, teacherId: teacherId || null, startTime, endTime, isBreak, breakLabel },
+        include: { student: true, teacher: true }
       })
 
       if (oldLesson.isProcessed && oldLesson.made) {

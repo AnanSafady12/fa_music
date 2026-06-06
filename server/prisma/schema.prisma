@@ -49,6 +49,7 @@ model Teacher {
   costPerLesson Float    @default(0)
   rooms         Room[]
   monthlyStats  MonthlyTeacherStats[]
+  lessons       Lesson[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -115,6 +116,8 @@ model Lesson {
   roomId    Int
   student   Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
   studentId Int?
+  teacher   Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  teacherId Int?
   startTime String
   endTime   String
   made      Boolean  @default(true)

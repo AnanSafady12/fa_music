@@ -3,16 +3,18 @@ import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSenso
 
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { INSTRUMENTS, PACKAGES, timeToMins, minsToTime, DAY_NAMES } from '../types'
-import type { Schedule, Student, Room, Lesson } from '../types'
+import type { Schedule, Student, Room, Lesson, Teacher } from '../types'
 import {
   getStudents, getScheduleByDate, createSchedule, createLesson, updateLesson,
   deleteLesson, toggleAttendance, copyLastWeek, getSchedules,
-  createStudent, updateStudent, deleteStudent, insertBreak, updateRoom
+  createStudent, updateStudent, deleteStudent, insertBreak, updateRoom,
+  getTeachers
 } from '../api'
 import './SchedulePage.css'
 
 export default function SchedulePage() {
   const [students, setStudents] = useState<Student[]>([])
+  const [teachers, setTeachers] = useState<Teacher[]>([])
   const [schedule, setSchedule] = useState<Schedule | null>(null)
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date()
@@ -34,9 +36,23 @@ export default function SchedulePage() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [studentForm, setStudentForm] = useState({ name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, paidPacks: '', notes: '' })
   const [durationModal, setDurationModal] = useState<{ lesson: Lesson, duration: number } | null>(null)
+  const [teacherSelectModal, setTeacherSelectModal] = useState<{
+    studentId: number
+    roomId: number
+    time: string
+    existingLessonId?: number
+    sameInstrumentTeachers: Teacher[]
+  } | null>(null)
 
   const loadStudents = async () => setStudents(await getStudents())
   const loadAllSchedules = async () => setAllSchedules(await getSchedules())
+  const loadTeachers = async () => {
+    try {
+      setTeachers(await getTeachers())
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const loadSchedule = useCallback(async (date: string) => {
     setLoading(true)
@@ -60,6 +76,7 @@ export default function SchedulePage() {
   useEffect(() => {
     loadStudents()
     loadAllSchedules()
+    loadTeachers()
   }, [])
 
   useEffect(() => {
@@ -93,6 +110,61 @@ export default function SchedulePage() {
         const l = r.lessons.find(l => l.id === lessonId)
         if (l?.student) { setDragging(l.student); break }
       }
+    }
+  }
+
+  const executeSaveLesson = async (params: {
+    studentId: number
+    roomId: number
+    time: string
+    existingLessonId?: number
+    teacherId: number | null
+  }) => {
+    const { studentId, roomId, time, existingLessonId, teacherId } = params
+    setSaving(true)
+    const newEnd = minsToTime(timeToMins(time) + 45)
+    try {
+      // Find the room and the existing lesson in that room
+      const room = schedule?.rooms.find(r => r.id === roomId)
+      const existingLesson = room?.lessons.find(l => l.startTime === time)
+
+      // Clean up ghost lesson (no student assigned) before dropping the new one
+      if (existingLesson && !existingLesson.studentId && !existingLesson.isBreak) {
+        await deleteLesson(existingLesson.id)
+      }
+
+      if (existingLessonId) {
+        await updateLesson(existingLessonId, { roomId, studentId, teacherId, startTime: time, endTime: newEnd, isBreak: false })
+      } else {
+        await createLesson({ roomId, studentId, teacherId, startTime: time, endTime: newEnd, isBreak: false })
+      }
+      await loadSchedule(selectedDate)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSaving(false)
+      setTeacherSelectModal(null)
+    }
+  }
+
+  const handleEditLessonTeacher = (lesson: Lesson) => {
+    if (!lesson.studentId) return
+    const student = students.find(s => s.id === lesson.studentId)
+    if (!student?.instrument) {
+      alert("This student has no instrument assigned, assign one first.")
+      return
+    }
+    const matchingTeachers = teachers.filter(t => t.instrument === student.instrument)
+    if (matchingTeachers.length > 0) {
+      setTeacherSelectModal({
+        studentId: lesson.studentId,
+        roomId: lesson.roomId,
+        time: lesson.startTime,
+        existingLessonId: lesson.id,
+        sameInstrumentTeachers: matchingTeachers
+      })
+    } else {
+      alert(`No teachers registered for ${student.instrument}`)
     }
   }
 
@@ -130,21 +202,36 @@ export default function SchedulePage() {
       if (l) { fromLesson = l; break }
     }
 
-    setSaving(true)
-    const newEnd = minsToTime(timeToMins(time) + 45)
-    try {
-      // Clean up ghost lesson (no student assigned) before dropping the new one
-      if (existingLesson && !existingLesson.studentId && !existingLesson.isBreak) {
-        await deleteLesson(existingLesson.id)
-      }
+    const student = students.find(s => s.id === studentId)
+    const matchingTeachers = teachers.filter(t => t.instrument && student?.instrument && t.instrument === student.instrument)
 
-      if (fromLesson) {
-        await updateLesson(fromLesson.id, { roomId: room.id, studentId, startTime: time, endTime: newEnd, isBreak: false })
-      } else {
-        await createLesson({ roomId: room.id, studentId, startTime: time, endTime: newEnd, isBreak: false })
-      }
-      await loadSchedule(selectedDate)
-    } finally { setSaving(false) }
+    // Preserve teacher if already assigned on fromLesson when moving
+    if (fromLesson && fromLesson.teacherId) {
+      await executeSaveLesson({
+        studentId,
+        roomId: room.id,
+        time,
+        existingLessonId: fromLesson.id,
+        teacherId: fromLesson.teacherId
+      })
+    } else if (matchingTeachers.length > 1) {
+      setTeacherSelectModal({
+        studentId,
+        roomId: room.id,
+        time,
+        existingLessonId: fromLesson?.id,
+        sameInstrumentTeachers: matchingTeachers
+      })
+    } else {
+      const assignedTeacherId = matchingTeachers.length === 1 ? matchingTeachers[0].id : null
+      await executeSaveLesson({
+        studentId,
+        roomId: room.id,
+        time,
+        existingLessonId: fromLesson?.id,
+        teacherId: assignedTeacherId
+      })
+    }
   }
 
   const handleRemoveLesson = async (lessonId: number) => {
@@ -366,6 +453,7 @@ export default function SchedulePage() {
                   onAddBreak={(time) => setBreakModal({ roomId: room.id, time })}
                   onRenameRoom={handleRenameRoom}
                   onEditDuration={(lesson) => setDurationModal({ lesson, duration: timeToMins(lesson.endTime) - timeToMins(lesson.startTime) })}
+                  onEditTeacher={handleEditLessonTeacher}
                 />
               ))
             )}
@@ -545,6 +633,51 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
+
+      {teacherSelectModal && (
+        <div className="modal-overlay" onClick={() => setTeacherSelectModal(null)}>
+          <div className="modal" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Select Teacher</div>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Choose a teacher for this lesson:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {teacherSelectModal.sameInstrumentTeachers.map(teacher => (
+                <button
+                  key={teacher.id}
+                  className="btn btn-secondary"
+                  style={{ justifyContent: 'flex-start', padding: '12px 16px', fontSize: 14 }}
+                  onClick={() => executeSaveLesson({
+                    studentId: teacherSelectModal.studentId,
+                    roomId: teacherSelectModal.roomId,
+                    time: teacherSelectModal.time,
+                    existingLessonId: teacherSelectModal.existingLessonId,
+                    teacherId: teacher.id
+                  })}
+                >
+                  🧑‍🏫 {teacher.name}
+                </button>
+              ))}
+              <button
+                className="btn btn-danger btn-ghost"
+                style={{ justifyContent: 'flex-start', padding: '12px 16px', fontSize: 14, border: '1px dashed var(--red)' }}
+                onClick={() => executeSaveLesson({
+                  studentId: teacherSelectModal.studentId,
+                  roomId: teacherSelectModal.roomId,
+                  time: teacherSelectModal.time,
+                  existingLessonId: teacherSelectModal.existingLessonId,
+                  teacherId: null
+                })}
+              >
+                🚫 Leave Unassigned
+              </button>
+            </div>
+            <div className="modal-actions" style={{ marginTop: 20 }}>
+              <button className="btn btn-secondary" onClick={() => setTeacherSelectModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -616,13 +749,14 @@ function generateRoomTimeline(_dayName: string, lessons: Lesson[]) {
   return items
 }
 
-function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom, onEditDuration }: {
+function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom, onEditDuration, onEditTeacher }: {
   room: Room; roomIndex: number; dayName: string;
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
   onAddBreak: (time: string) => void
   onRenameRoom: (id: number, name: string) => void
   onEditDuration: (lesson: Lesson) => void
+  onEditTeacher: (lesson: Lesson) => void
 }) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [tempName, setTempName] = useState(room.name)
@@ -657,6 +791,7 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
             onToggleAttendance={onToggleAttendance}
             onAddBreak={onAddBreak}
             onEditDuration={onEditDuration}
+            onEditTeacher={onEditTeacher}
           />
         ))}
       </div>
@@ -664,12 +799,13 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
   )
 }
 
-function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttendance, onAddBreak, onEditDuration }: {
+function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttendance, onAddBreak, onEditDuration, onEditTeacher }: {
   roomIndex: number; time: string; duration: number; lesson?: Lesson
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
   onAddBreak: (time: string) => void
   onEditDuration: (lesson: Lesson) => void
+  onEditTeacher: (lesson: Lesson) => void
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `${roomIndex}::${time}` })
   const endTimeStr = minsToTime(timeToMins(time) + duration)
@@ -685,7 +821,18 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   }
 
   if (lesson?.student) {
-    return <DraggableOccupiedSlot setDropRef={setNodeRef} lesson={lesson} time={time} endTimeStr={endTimeStr} onRemove={onRemove} onToggleAttendance={onToggleAttendance} onEditDuration={onEditDuration} />
+    return (
+      <DraggableOccupiedSlot
+        setDropRef={setNodeRef}
+        lesson={lesson}
+        time={time}
+        endTimeStr={endTimeStr}
+        onRemove={onRemove}
+        onToggleAttendance={onToggleAttendance}
+        onEditDuration={onEditDuration}
+        onEditTeacher={onEditTeacher}
+      />
+    )
   }
 
   return (
@@ -697,7 +844,7 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   )
 }
 
-function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance, onEditDuration }: {
+function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance, onEditDuration, onEditTeacher }: {
   setDropRef: (el: HTMLElement | null) => void
   lesson: Lesson
   time: string
@@ -705,6 +852,7 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
   onEditDuration: (lesson: Lesson) => void
+  onEditTeacher: (lesson: Lesson) => void
 }) {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: `lesson-${lesson.id}` })
   const rem = (lesson.student?.totalLessons || 0) - (lesson.student?.completedLessons || 0)
@@ -713,7 +861,7 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
     <div
       ref={(node) => { setDropRef(node); setDragRef(node); }}
       className={`time-slot occupied ${!lesson.made ? 'not-made' : ''} ${isDragging ? 'dragging' : ''}`}
-      style={{ cursor: 'grab', ...(isDragging ? { opacity: 0.4 } : {}) }}
+      style={{ cursor: 'grab', ...(isDragging ? { opacity: 0.4 } : {}), display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px' }}
       {...listeners}
       {...attributes}
     >
@@ -721,27 +869,61 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
         <span className="slot-time">{time} - {endTimeStr}</span>
         {lesson.student?.instrument && <span className="tag tag-instrument" style={{ fontSize: 8, padding: '1px 4px' }}>{lesson.student.instrument}</span>}
       </div>
-      <div className="slot-student">
-        <span className="slot-name">{lesson.student?.name}</span>
-        {rem <= 2 && (lesson.student?.totalLessons || 0) > 0 && (
-          <span style={{ fontSize: 9, color: 'var(--red)' }}>⚠️</span>
-        )}
-        {lesson.student?.notes && (
-          <span title={lesson.student.notes} style={{ fontSize: 9, cursor: 'help' }}>📝</span>
+      <div className="slot-student" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+          <span className="slot-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.student?.name}</span>
+          {rem <= 2 && (lesson.student?.totalLessons || 0) > 0 && (
+            <span style={{ fontSize: 9, color: 'var(--red)', marginLeft: 4 }}>⚠️</span>
+          )}
+          {lesson.student?.notes && (
+            <span title={lesson.student.notes} style={{ fontSize: 9, cursor: 'help', marginLeft: 4 }}>📝</span>
+          )}
+        </div>
+        
+        {lesson.student?.instrument && (
+          <div 
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onEditTeacher(lesson)
+            }} 
+            style={{ 
+              fontSize: 9, 
+              color: 'var(--text-secondary)', 
+              cursor: 'pointer', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '2px', 
+              background: 'var(--bg-600)', 
+              padding: '2px 6px', 
+              borderRadius: '4px', 
+              border: '1px solid var(--border)',
+              userSelect: 'none',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}
+            title="Click to assign or change teacher"
+          >
+            🧑‍🏫 {lesson.teacher?.name || 'Assign Teacher'} ✏️
+          </div>
         )}
       </div>
-      {!lesson.made && <span className="not-made-label">Not Made</span>}
-      <div className="slot-actions">
-        <button
-          className={`btn btn-sm ${lesson.made ? 'btn-ghost' : 'btn-danger'}`}
-          onClick={() => onToggleAttendance(lesson.id)}
-          title={lesson.made ? 'Mark as not made' : 'Mark as made'}
-          style={{ padding: '2px 6px', fontSize: 10 }}
-        >
-          {lesson.made ? '✓' : '✗'}
-        </button>
-        <button className="slot-remove" onClick={() => onEditDuration(lesson)} title="Edit Duration">⏱️</button>
-        <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+        <div>
+          {!lesson.made && <span className="not-made-label">Not Made</span>}
+        </div>
+        <div className="slot-actions" onClick={e => e.stopPropagation()}>
+          <button
+            className={`btn btn-sm ${lesson.made ? 'btn-ghost' : 'btn-danger'}`}
+            onClick={() => onToggleAttendance(lesson.id)}
+            title={lesson.made ? 'Mark as not made' : 'Mark as made'}
+            style={{ padding: '2px 6px', fontSize: 10 }}
+          >
+            {lesson.made ? '✓' : '✗'}
+          </button>
+          <button className="slot-remove" onClick={() => onEditDuration(lesson)} title="Edit Duration">⏱️</button>
+          <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
+        </div>
       </div>
     </div>
   )

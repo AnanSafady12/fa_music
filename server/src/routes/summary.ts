@@ -65,6 +65,7 @@ router.get('/', async (req, res) => {
       where: baseWhere,
       include: {
         student: true,
+        teacher: true,
         room: { include: { schedule: true } }
       }
     })
@@ -84,20 +85,24 @@ router.get('/', async (req, res) => {
       return false
     })
 
-    // 5. Count lessons by instrument
-    const instrumentLessonCounts: Record<string, number> = {}
-    for (const lesson of processedLessons) {
-      const instr = lesson.student?.instrument
-      if (instr) {
-        const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
-        instrumentLessonCounts[instr] = (instrumentLessonCounts[instr] || 0) + multiplier
-      }
-    }
-
-    // 6. Calculate teacher salaries
+    // 5. Calculate teacher salaries
     const teacherSalaries = teachers.map(teacher => {
       const stats = teacher.monthlyStats[0] || null
-      const lessonsTaught = teacher.instrument ? (instrumentLessonCounts[teacher.instrument] || 0) : 0
+      
+      let lessonsTaught = 0
+      for (const lesson of processedLessons) {
+        const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
+        if (lesson.teacherId === teacher.id) {
+          lessonsTaught += multiplier
+        } else if (lesson.teacherId === null && lesson.student?.instrument === teacher.instrument) {
+          // Legacy fallback: attribute lesson if this is the ONLY teacher for that instrument
+          const sameInstrumentTeachers = teachers.filter(t => t.instrument === teacher.instrument)
+          if (sameInstrumentTeachers.length === 1) {
+            lessonsTaught += multiplier
+          }
+        }
+      }
+
       const calculatedSalary = lessonsTaught * teacher.costPerLesson
       const earnedSalary = stats?.manualSalary !== null && stats?.manualSalary !== undefined ? stats.manualSalary : calculatedSalary
 
