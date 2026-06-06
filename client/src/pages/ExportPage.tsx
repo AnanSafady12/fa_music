@@ -22,13 +22,19 @@ export default function ExportPage() {
     getSchedules().then((s: Schedule[]) => {
       setSchedules(s)
       if (s.length > 0) {
-        const sortedDesc = [...s].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        const newestWithLessons = sortedDesc.find(sch =>
-          sch.rooms.some(r => r.lessons && r.lessons.length > 0)
-        )
-        if (newestWithLessons) {
-          setSelectedId(newestWithLessons.id)
+        // Try to match current local day (YYYY-MM-DD)
+        const localDate = new Date()
+        const y = localDate.getFullYear()
+        const m = String(localDate.getMonth() + 1).padStart(2, '0')
+        const d = String(localDate.getDate()).padStart(2, '0')
+        const todayStr = `${y}-${m}-${d}`
+
+        const todaySchedule = s.find(sch => sch.date.split('T')[0] === todayStr)
+        if (todaySchedule) {
+          setSelectedId(todaySchedule.id)
         } else {
+          // Fallback to the newest schedule overall
+          const sortedDesc = [...s].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
           setSelectedId(sortedDesc[0].id)
         }
       }
