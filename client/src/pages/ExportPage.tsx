@@ -19,9 +19,19 @@ export default function ExportPage() {
   }, [selectedId, schedule])
 
   useEffect(() => {
-    getSchedules().then(s => {
+    getSchedules().then((s: Schedule[]) => {
       setSchedules(s)
-      if (s.length > 0) setSelectedId(s[0].id)
+      if (s.length > 0) {
+        const sortedDesc = [...s].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        const newestWithLessons = sortedDesc.find(sch =>
+          sch.rooms.some(r => r.lessons && r.lessons.length > 0)
+        )
+        if (newestWithLessons) {
+          setSelectedId(newestWithLessons.id)
+        } else {
+          setSelectedId(sortedDesc[0].id)
+        }
+      }
     })
   }, [])
 
