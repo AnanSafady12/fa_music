@@ -68,11 +68,24 @@ model MonthlyTeacherStats {
 }
 
 model Worker {
-  id           Int      @id @default(autoincrement())
-  name         String   @default("Worker")
-  costPerHour  Float    @default(0)
-  totalHours   Float    @default(0)
-  updatedAt    DateTime @updatedAt
+  id           Int         @id @default(autoincrement())
+  name         String      @default("Worker")
+  costPerHour  Float       @default(0)
+  totalHours   Float       @default(0)
+  logs         WorkerLog[]
+  updatedAt    DateTime    @updatedAt
+}
+
+model WorkerLog {
+  id          Int      @id @default(autoincrement())
+  workerId    Int
+  worker      Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  date        DateTime
+  hours       Float
+  costPerHour Float
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Schedule {

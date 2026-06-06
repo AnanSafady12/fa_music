@@ -59,6 +59,15 @@ export interface Worker {
   totalHours: number
 }
 
+export interface WorkerLog {
+  id: number
+  workerId: number
+  date: string
+  hours: number
+  costPerHour: number
+  notes?: string
+}
+
 export interface Lesson {
   id: number
   roomId: number

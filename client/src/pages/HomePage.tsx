@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSummary, updateTeacherStats, updateWorker } from '../api'
+import { getSummary, updateTeacherStats, updateWorker, getWorkerLogs, createWorkerLog, deleteWorkerLog } from '../api'
 import './HomePage.css'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -16,6 +16,14 @@ export default function HomePage() {
   const [isEditingWorker, setIsEditingWorker] = useState(false)
   const [isSavingWorker, setIsSavingWorker] = useState(false)
   
+  // Local state for worker logs
+  const [logs, setLogs] = useState<any[]>([])
+  const [newLogForm, setNewLogForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    hours: '',
+    notes: ''
+  })
+
   // Local state for editing teacher notes/salary
   const [editingTeacherId, setEditingTeacherId] = useState<number | null>(null)
   const [teacherForm, setTeacherForm] = useState({ notes: '', manualSalary: '' as string | number })
@@ -30,11 +38,48 @@ export default function HomePage() {
       console.error(err)
       setLoading(false)
     })
+
+    getWorkerLogs(selectedMonth, selectedYear).then(data => {
+      setLogs(data)
+    }).catch(err => {
+      console.error(err)
+    })
   }
 
   useEffect(() => {
     load()
   }, [selectedMonth, selectedYear])
+
+  const handleAddLog = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newLogForm.date || !newLogForm.hours) return
+    try {
+      await createWorkerLog({
+        date: newLogForm.date,
+        hours: Number(newLogForm.hours),
+        costPerHour: summary.worker.costPerHour,
+        notes: newLogForm.notes
+      })
+      setNewLogForm({
+        date: new Date().toISOString().split('T')[0],
+        hours: '',
+        notes: ''
+      })
+      load()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleDeleteLog = async (logId: number) => {
+    if (!confirm('Are you sure you want to delete this log?')) return
+    try {
+      await deleteWorkerLog(logId)
+      load()
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const saveWorker = async () => {
     setIsSavingWorker(true)
@@ -197,22 +242,22 @@ export default function HomePage() {
         </div>
 
         {/* Worker Section */}
-        <div className="card worker-card">
+        <div className="card worker-card" style={{ gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3 style={{ margin: 0 }}>Institute Worker</h3>
+            <h3 style={{ margin: 0 }}>Institute Worker & Daily Logs</h3>
             {!isEditingWorker ? (
-              <button className="btn btn-ghost btn-sm" onClick={() => setIsEditingWorker(true)}>✏️ Edit Worker</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setIsEditingWorker(true)}>⚙️ Configure Worker</button>
             ) : (
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-primary btn-sm" onClick={saveWorker} disabled={isSavingWorker}>
-                  {isSavingWorker ? 'Saving...' : 'Save Changes'}
+                  {isSavingWorker ? 'Saving...' : 'Save Config'}
                 </button>
                 <button className="btn btn-secondary btn-sm" onClick={() => { setIsEditingWorker(false); setWorkerForm(summary.worker); }}>Cancel</button>
               </div>
             )}
           </div>
           
-          <div className="form-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+          <div className="form-row" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '1.5rem' }}>
             <div className="form-group">
               <label>Worker Name</label>
               {isEditingWorker ? (
@@ -238,26 +283,104 @@ export default function HomePage() {
                 <div style={{ padding: '8px 0', color: 'var(--text-secondary)' }}>₪{workerForm?.costPerHour || 0}</div>
               )}
             </div>
-            <div className="form-group">
-              <label>Hours Worked</label>
-              {isEditingWorker ? (
-                <input 
-                  type="number"
-                  className="input" 
-                  value={workerForm?.totalHours || 0} 
-                  onChange={e => setWorkerForm((f: any) => ({ ...f, totalHours: Number(e.target.value) }))} 
-                />
-              ) : (
-                <div style={{ padding: '8px 0', color: 'var(--text-secondary)' }}>{workerForm?.totalHours || 0} hrs</div>
-              )}
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1.5rem 0' }} />
+
+          <h4 style={{ marginBottom: '1rem' }}>Log Hours for {MONTHS[selectedMonth - 1]}</h4>
+          <form onSubmit={handleAddLog} className="form-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Date</label>
+              <input 
+                type="date" 
+                className="input" 
+                value={newLogForm.date} 
+                onChange={e => setNewLogForm(f => ({ ...f, date: e.target.value }))}
+                required
+              />
             </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Hours Worked</label>
+              <input 
+                type="number" 
+                step="0.1" 
+                min="0"
+                placeholder="e.g. 5" 
+                className="input" 
+                value={newLogForm.hours} 
+                onChange={e => setNewLogForm(f => ({ ...f, hours: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Day/Description Notes</label>
+              <input 
+                type="text" 
+                placeholder="e.g. Sunday 1 June" 
+                className="input" 
+                value={newLogForm.notes} 
+                onChange={e => setNewLogForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ height: 38, justifyContent: 'center' }}>
+              ➕ Add Daily Log
+            </button>
+          </form>
+
+          <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Hours Worked</th>
+                  <th>Rate (/Hour)</th>
+                  <th>Payout</th>
+                  <th>Notes/Description</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log: any) => {
+                  const logDate = new Date(log.date)
+                  const weekday = logDate.toLocaleDateString('en-US', { weekday: 'long' })
+                  const dateStr = logDate.toLocaleDateString('en-GB')
+                  return (
+                    <tr key={log.id}>
+                      <td style={{ fontWeight: 600 }}>{weekday}, {dateStr}</td>
+                      <td>{log.hours} hrs</td>
+                      <td style={{ color: 'var(--text-muted)' }}>₪{log.costPerHour}</td>
+                      <td style={{ color: 'var(--gold)', fontWeight: 600 }}>₪{(log.hours * log.costPerHour).toLocaleString()}</td>
+                      <td style={{ color: 'var(--text-secondary)' }}>{log.notes || '—'}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button className="btn btn-danger btn-sm btn-icon" onClick={() => handleDeleteLog(log.id)}>🗑️</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {logs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>
+                      No hours logged for {MONTHS[selectedMonth - 1]} {selectedYear}.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
           
           <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--bg-800)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Current Month Payout:</span>
-            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--gold)' }}>
-              ₪{( (workerForm?.costPerHour || 0) * (workerForm?.totalHours || 0) ).toLocaleString()}
-            </span>
+            <div>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Total Month Hours: </span>
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginLeft: 6 }}>
+                {logs.reduce((sum, l) => sum + l.hours, 0)} hrs
+              </span>
+            </div>
+            <div>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Current Month Payout: </span>
+              <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--gold)', marginLeft: 6 }}>
+                ₪{summary.workerLiability.toLocaleString()}
+              </span>
+            </div>
           </div>
         </div>
       </div>

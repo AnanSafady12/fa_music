@@ -113,8 +113,26 @@ router.get('/', async (req, res) => {
       }
     })
 
+    // 7. Calculate worker hours and liability dynamically from logs for this month/year
+    let workerHours = 0
+    let workerLiability = 0
+    if (month !== null && year !== null) {
+      const startDate = new Date(Date.UTC(year, month - 1, 1))
+      const endDate = new Date(Date.UTC(year, month, 1))
+      const logs = await prisma.workerLog.findMany({
+        where: {
+          workerId: worker.id,
+          date: {
+            gte: startDate,
+            lt: endDate
+          }
+        }
+      })
+      workerHours = logs.reduce((sum, log) => sum + log.hours, 0)
+      workerLiability = logs.reduce((sum, log) => sum + (log.hours * log.costPerHour), 0)
+    }
+
     const totalTeacherLiabilities = teacherSalaries.reduce((sum, t) => sum + t.earnedSalary, 0)
-    const workerLiability = worker.costPerHour * worker.totalHours
     const grandTotalLiabilities = totalTeacherLiabilities + workerLiability
 
     res.json({
@@ -124,7 +142,10 @@ router.get('/', async (req, res) => {
       },
       teacherSalaries,
       totalTeacherLiabilities,
-      worker,
+      worker: {
+        ...worker,
+        totalHours: workerHours
+      },
       workerLiability,
       grandTotalLiabilities
     })
