@@ -4,7 +4,7 @@ import type { Student } from '../types'
 import { INSTRUMENTS, PACKAGES } from '../types'
 import { getStudents, createStudent, updateStudent, deleteStudent, getStudentHistory } from '../api'
 
-const emptyForm = { name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, amountPaid: 0 as string | number, notes: '' }
+const emptyForm = { name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, amountPaid: 0 as string | number, paidPacks: '', notes: '' }
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
@@ -56,6 +56,7 @@ export default function StudentsPage() {
       completedLessons: s.completedLessons, 
       hasPaid: s.hasPaid, 
       amountPaid: s.amountPaid || 0,
+      paidPacks: s.paidPacks || '',
       notes: s.notes || '' 
     })
     setModalOpen(true)
@@ -83,10 +84,41 @@ export default function StudentsPage() {
       totalLessons: Number(form.totalLessons), 
       completedLessons: Number(form.completedLessons), 
       hasPaid: form.hasPaid,
-      amountPaid: Number(form.amountPaid) || 0
+      amountPaid: Number(form.amountPaid) || 0,
+      paidPacks: form.paidPacks
     }
     if (editing) { await updateStudent(editing.id, payload) } else { await createStudent(payload) }
     closeModal(); load()
+  }
+
+  const getFormPacks = () => {
+    const numPacks = Math.ceil(Number(form.totalLessons) / 4)
+    const parts = form.paidPacks ? form.paidPacks.split(',') : []
+    const list: boolean[] = []
+    for (let i = 0; i < numPacks; i++) {
+      list.push(i < parts.length ? parts[i] === '1' : form.hasPaid)
+    }
+    return list
+  }
+
+  const toggleFormPack = (idx: number) => {
+    const packsList = getFormPacks()
+    packsList[idx] = !packsList[idx]
+    const newPaidPacks = packsList.map(v => v ? '1' : '0').join(',')
+    const newHasPaid = !packsList.includes(false)
+    setForm(f => ({ ...f, paidPacks: newPaidPacks, hasPaid: newHasPaid }))
+  }
+
+  const handleTotalLessonsChange = (val: number) => {
+    const numPacks = Math.ceil(val / 4)
+    const parts = form.paidPacks ? form.paidPacks.split(',') : []
+    const newParts: string[] = []
+    for (let i = 0; i < numPacks; i++) {
+      newParts.push(i < parts.length ? parts[i] : (form.hasPaid ? '1' : '0'))
+    }
+    const newPaidPacks = newParts.join(',')
+    const newHasPaid = !newParts.includes('0')
+    setForm(f => ({ ...f, totalLessons: val, paidPacks: newPaidPacks, hasPaid: newHasPaid }))
   }
 
   const remove = async (s: Student) => {
@@ -95,17 +127,36 @@ export default function StudentsPage() {
     load()
   }
 
-  const togglePaid = async (s: Student) => {
-    const newStatus = !s.hasPaid
-    setStudents(prev => prev.map(st => st.id === s.id ? { ...st, hasPaid: newStatus } : st))
-    await updateStudent(s.id, { ...s, hasPaid: newStatus })
+
+
+  const getStudentPacks = (s: Student) => {
+    const numPacks = Math.ceil(s.totalLessons / 4)
+    const parts = s.paidPacks ? s.paidPacks.split(',') : []
+    const list: boolean[] = []
+    for (let i = 0; i < numPacks; i++) {
+      list.push(i < parts.length ? parts[i] === '1' : s.hasPaid)
+    }
+    return list
+  }
+
+  const togglePackPaid = async (s: Student, idx: number) => {
+    const packsList = getStudentPacks(s)
+    packsList[idx] = !packsList[idx]
+    const newPaidPacks = packsList.map(v => v ? '1' : '0').join(',')
+    const newHasPaid = !packsList.includes(false)
+
+    setStudents(prev => prev.map(st => st.id === s.id ? { ...st, paidPacks: newPaidPacks, hasPaid: newHasPaid } : st))
+    await updateStudent(s.id, { ...s, paidPacks: newPaidPacks, hasPaid: newHasPaid })
   }
 
   const renewPack = async (s: Student) => {
     if (!confirm(`Renew packet for ${s.name}? This will add 4 lessons and set status to Unpaid.`)) return
     const newTotal = s.totalLessons + 4
-    setStudents(prev => prev.map(st => st.id === s.id ? { ...st, totalLessons: newTotal, hasPaid: false } : st))
-    await updateStudent(s.id, { ...s, totalLessons: newTotal, hasPaid: false })
+    const parts = s.paidPacks ? s.paidPacks.split(',') : []
+    parts.push('0')
+    const newPaidPacks = parts.join(',')
+    setStudents(prev => prev.map(st => st.id === s.id ? { ...st, totalLessons: newTotal, paidPacks: newPaidPacks, hasPaid: false } : st))
+    await updateStudent(s.id, { ...s, totalLessons: newTotal, paidPacks: newPaidPacks, hasPaid: false })
   }
 
   const remaining = (s: Student) => s.totalLessons - s.completedLessons
@@ -229,12 +280,35 @@ export default function StudentsPage() {
                           <div className="lessons-bar-fill" style={{ width: `${pct}%`, ...(left <= 2 ? { background: 'var(--red)' } : {}) }} />
                         </div>
                       </td>
-                      <td onClick={(e) => { e.stopPropagation(); togglePaid(s); }} style={{ cursor: 'pointer' }}>
-                        {s.hasPaid ? (
-                          <span className="tag tag-instrument" style={{ background: 'var(--green)', color: '#fff' }}>Paid</span>
-                        ) : (
-                          <span className="tag tag-warning" style={{ background: 'var(--surface)', border: '1px solid var(--red)', color: 'var(--red)' }}>Unpaid</span>
-                        )}
+                      <td onClick={(e) => e.stopPropagation()} style={{ cursor: 'default' }}>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 180 }}>
+                          {getStudentPacks(s).map((isPaid, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => togglePackPaid(s, idx)}
+                              className="btn btn-sm"
+                              style={{
+                                padding: '2px 5px',
+                                fontSize: 10,
+                                borderRadius: 4,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 2,
+                                ...(isPaid 
+                                  ? { background: 'var(--green)', color: '#fff', border: '1px solid var(--green)' }
+                                  : { background: 'var(--bg-600)', color: 'var(--red)', border: '1px solid var(--red)' }
+                                )
+                              }}
+                              title={isPaid ? `Pack #${idx + 1} Paid. Click to set Unpaid.` : `Pack #${idx + 1} Unpaid. Click to set Paid.`}
+                            >
+                              P{idx + 1}: {isPaid ? 'Paid' : 'Unpaid'}
+                            </button>
+                          ))}
+                          {getStudentPacks(s).length === 0 && (
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>No packs</span>
+                          )}
+                        </div>
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                         {new Date(s.registrationDate).toLocaleDateString()}
@@ -300,7 +374,7 @@ export default function StudentsPage() {
             <div className="form-row">
               <div className="form-group">
                 <label>Total Lessons</label>
-                <input className="input" type="number" min="0" value={form.totalLessons} onChange={e => setForm(f => ({ ...f, totalLessons: Number(e.target.value) }))} />
+                <input className="input" type="number" min="0" value={form.totalLessons} onChange={e => handleTotalLessonsChange(Number(e.target.value))} />
               </div>
               <div className="form-group">
                 <label>Completed Lessons</label>
@@ -314,10 +388,34 @@ export default function StudentsPage() {
                 <input className="input" type="number" min="0" value={form.amountPaid} onChange={e => setForm(f => ({ ...f, amountPaid: e.target.value }))} placeholder="0" />
               </div>
               <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'flex-start', paddingTop: 24 }}>
-                <input type="checkbox" id="hasPaid" checked={form.hasPaid} onChange={e => setForm(f => ({ ...f, hasPaid: e.target.checked }))} style={{ width: 18, height: 18 }} />
+                <input type="checkbox" id="hasPaid" checked={form.hasPaid} onChange={e => {
+                  const checkVal = e.target.checked
+                  const numPacks = Math.ceil(Number(form.totalLessons) / 4)
+                  const newPaidPacks = Array(numPacks).fill(checkVal ? '1' : '0').join(',')
+                  setForm(f => ({ ...f, hasPaid: checkVal, paidPacks: newPaidPacks }))
+                }} style={{ width: 18, height: 18 }} />
                 <label htmlFor="hasPaid" style={{ margin: 0 }}>Fully Paid</label>
               </div>
             </div>
+
+            {Math.ceil(Number(form.totalLessons) / 4) > 0 && (
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label>Packs Payment Status</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                  {getFormPacks().map((isPaid, idx) => (
+                    <label key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', background: 'var(--bg-600)', padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, textTransform: 'none', fontWeight: 'normal' }}>
+                      <input
+                        type="checkbox"
+                        checked={isPaid}
+                        onChange={() => toggleFormPack(idx)}
+                        style={{ width: 16, height: 16, cursor: 'pointer' }}
+                      />
+                      <span>Pack #{idx + 1}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="form-group">
               <label>Notes</label>

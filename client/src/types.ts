@@ -14,6 +14,7 @@ export interface Student {
   completedLessons: number
   hasPaid: boolean
   amountPaid: number
+  paidPacks: string
   notes?: string
   registrationDate: string
   createdAt: string

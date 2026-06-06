@@ -17,7 +17,21 @@ router.get('/', async (_req, res) => {
 // POST create student
 router.post('/', async (req, res) => {
   try {
-    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, amountPaid, notes } = req.body
+    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, amountPaid, paidPacks, notes } = req.body
+    
+    const numPacks = Math.ceil((totalLessons ?? 0) / 4)
+    let calculatedPaidPacks = paidPacks
+    if (calculatedPaidPacks === undefined || calculatedPaidPacks === null) {
+      calculatedPaidPacks = Array(numPacks).fill(hasPaid ? '1' : '0').join(',')
+    } else {
+      const parts = calculatedPaidPacks ? String(calculatedPaidPacks).split(',') : []
+      while (parts.length < numPacks) {
+        parts.push('0')
+      }
+      calculatedPaidPacks = parts.slice(0, numPacks).join(',')
+    }
+    const finalHasPaid = numPacks > 0 ? !calculatedPaidPacks.includes('0') : true
+
     const student = await prisma.student.create({
       data: { 
         name, 
@@ -28,13 +42,15 @@ router.post('/', async (req, res) => {
         instrument, 
         totalLessons: totalLessons ?? 0, 
         completedLessons: completedLessons ?? 0, 
-        hasPaid: hasPaid ?? false, 
+        hasPaid: finalHasPaid, 
         amountPaid: amountPaid ?? 0,
+        paidPacks: calculatedPaidPacks,
         notes 
       }
     })
     res.json(student)
   } catch (e) {
+    console.error(e)
     res.status(500).json({ error: 'Failed to create student' })
   }
 })
@@ -43,7 +59,21 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, amountPaid, notes } = req.body
+    const { name, parentName, phone, phone2, age, instrument, totalLessons, completedLessons, hasPaid, amountPaid, paidPacks, notes } = req.body
+
+    const numPacks = Math.ceil((totalLessons ?? 0) / 4)
+    let calculatedPaidPacks = paidPacks
+    if (calculatedPaidPacks === undefined || calculatedPaidPacks === null) {
+      calculatedPaidPacks = Array(numPacks).fill(hasPaid ? '1' : '0').join(',')
+    } else {
+      const parts = calculatedPaidPacks ? String(calculatedPaidPacks).split(',') : []
+      while (parts.length < numPacks) {
+        parts.push('0')
+      }
+      calculatedPaidPacks = parts.slice(0, numPacks).join(',')
+    }
+    const finalHasPaid = numPacks > 0 ? !calculatedPaidPacks.includes('0') : true
+
     const student = await prisma.student.update({
       where: { id },
       data: { 
@@ -55,13 +85,15 @@ router.put('/:id', async (req, res) => {
         instrument, 
         totalLessons, 
         completedLessons, 
-        hasPaid, 
+        hasPaid: finalHasPaid, 
         amountPaid: amountPaid ?? 0,
+        paidPacks: calculatedPaidPacks,
         notes 
       }
     })
     res.json(student)
   } catch (e) {
+    console.error(e)
     res.status(500).json({ error: 'Failed to update student' })
   }
 })

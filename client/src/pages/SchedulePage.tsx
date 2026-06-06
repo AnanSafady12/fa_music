@@ -32,7 +32,7 @@ export default function SchedulePage() {
   const [breakDuration, setBreakDuration] = useState<number>(15)
   const [studentModal, setStudentModal] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
-  const [studentForm, setStudentForm] = useState({ name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' })
+  const [studentForm, setStudentForm] = useState({ name: '', parentName: '', phone: '', phone2: '', age: '' as string | number, instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, paidPacks: '', notes: '' })
   const [durationModal, setDurationModal] = useState<{ lesson: Lesson, duration: number } | null>(null)
 
   const loadStudents = async () => setStudents(await getStudents())
@@ -234,12 +234,42 @@ export default function SchedulePage() {
     } finally { setSaving(false) }
   }
 
-  const openAddStudent = () => { setEditingStudent(null); setStudentForm({ name: '', parentName: '', phone: '', phone2: '', age: '', instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, notes: '' }); setStudentModal(true) }
-  const openEditStudent = (s: Student) => { setEditingStudent(s); setStudentForm({ name: s.name, parentName: s.parentName || '', phone: s.phone || '', phone2: s.phone2 || '', age: s.age || '', instrument: s.instrument || '', totalLessons: s.totalLessons, completedLessons: s.completedLessons, hasPaid: s.hasPaid, notes: s.notes || '' }); setStudentModal(true) }
+  const openAddStudent = () => { setEditingStudent(null); setStudentForm({ name: '', parentName: '', phone: '', phone2: '', age: '', instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, paidPacks: '', notes: '' }); setStudentModal(true) }
+  const openEditStudent = (s: Student) => { setEditingStudent(s); setStudentForm({ name: s.name, parentName: s.parentName || '', phone: s.phone || '', phone2: s.phone2 || '', age: s.age || '', instrument: s.instrument || '', totalLessons: s.totalLessons, completedLessons: s.completedLessons, hasPaid: s.hasPaid, paidPacks: s.paidPacks || '', notes: s.notes || '' }); setStudentModal(true) }
   const saveStudent = async () => {
-    const payload = { ...studentForm, age: studentForm.age === '' ? null : Number(studentForm.age), instrument: studentForm.instrument || null, totalLessons: Number(studentForm.totalLessons), completedLessons: Number(studentForm.completedLessons), hasPaid: studentForm.hasPaid }
+    const payload = { ...studentForm, age: studentForm.age === '' ? null : Number(studentForm.age), instrument: studentForm.instrument || null, totalLessons: Number(studentForm.totalLessons), completedLessons: Number(studentForm.completedLessons), hasPaid: studentForm.hasPaid, paidPacks: studentForm.paidPacks }
     if (editingStudent) { await updateStudent(editingStudent.id, payload) } else { await createStudent(payload) }
     setStudentModal(false); loadStudents()
+  }
+
+  const getFormPacks = () => {
+    const numPacks = Math.ceil(Number(studentForm.totalLessons) / 4)
+    const parts = studentForm.paidPacks ? studentForm.paidPacks.split(',') : []
+    const list: boolean[] = []
+    for (let i = 0; i < numPacks; i++) {
+      list.push(i < parts.length ? parts[i] === '1' : studentForm.hasPaid)
+    }
+    return list
+  }
+
+  const toggleFormPack = (idx: number) => {
+    const packsList = getFormPacks()
+    packsList[idx] = !packsList[idx]
+    const newPaidPacks = packsList.map(v => v ? '1' : '0').join(',')
+    const newHasPaid = !packsList.includes(false)
+    setStudentForm(f => ({ ...f, paidPacks: newPaidPacks, hasPaid: newHasPaid }))
+  }
+
+  const handleTotalLessonsChange = (val: number) => {
+    const numPacks = Math.ceil(val / 4)
+    const parts = studentForm.paidPacks ? studentForm.paidPacks.split(',') : []
+    const newParts: string[] = []
+    for (let i = 0; i < numPacks; i++) {
+      newParts.push(i < parts.length ? parts[i] : (studentForm.hasPaid ? '1' : '0'))
+    }
+    const newPaidPacks = newParts.join(',')
+    const newHasPaid = !newParts.includes('0')
+    setStudentForm(f => ({ ...f, totalLessons: val, paidPacks: newPaidPacks, hasPaid: newHasPaid }))
   }
   const removeStudent = async (id: number) => {
     if (!confirm('Are you sure you want to delete this student?')) return
@@ -440,20 +470,43 @@ export default function SchedulePage() {
                 <input className="input" value={studentForm.phone2} onChange={e => setStudentForm(f => ({ ...f, phone2: e.target.value }))} />
               </div>
             </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Total Lessons</label>
-                <input className="input" type="number" min="0" value={studentForm.totalLessons} onChange={e => setStudentForm(f => ({ ...f, totalLessons: Number(e.target.value) }))} />
-              </div>
-              <div className="form-group">
-                <label>Completed</label>
-                <input className="input" type="number" min="0" value={studentForm.completedLessons} onChange={e => setStudentForm(f => ({ ...f, completedLessons: Number(e.target.value) }))} />
-              </div>
-            </div>
-            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '10px 0' }}>
-              <input type="checkbox" id="scheduleHasPaid" checked={studentForm.hasPaid} onChange={e => setStudentForm(f => ({ ...f, hasPaid: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-              <label htmlFor="scheduleHasPaid" style={{ margin: 0, cursor: 'pointer' }}>Student has paid for the package</label>
-            </div>
+             <div className="form-row">
+               <div className="form-group">
+                 <label>Total Lessons</label>
+                 <input className="input" type="number" min="0" value={studentForm.totalLessons} onChange={e => handleTotalLessonsChange(Number(e.target.value))} />
+               </div>
+               <div className="form-group">
+                 <label>Completed</label>
+                 <input className="input" type="number" min="0" value={studentForm.completedLessons} onChange={e => setStudentForm(f => ({ ...f, completedLessons: Number(e.target.value) }))} />
+               </div>
+             </div>
+             <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '10px 0' }}>
+               <input type="checkbox" id="scheduleHasPaid" checked={studentForm.hasPaid} onChange={e => {
+                 const checkVal = e.target.checked
+                 const numPacks = Math.ceil(Number(studentForm.totalLessons) / 4)
+                 const newPaidPacks = Array(numPacks).fill(checkVal ? '1' : '0').join(',')
+                 setStudentForm(f => ({ ...f, hasPaid: checkVal, paidPacks: newPaidPacks }))
+               }} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+               <label htmlFor="scheduleHasPaid" style={{ margin: 0, cursor: 'pointer' }}>Fully Paid</label>
+             </div>
+             {Math.ceil(Number(studentForm.totalLessons) / 4) > 0 && (
+               <div className="form-group" style={{ marginBottom: 14 }}>
+                 <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Packs Payment Status</label>
+                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                   {getFormPacks().map((isPaid, idx) => (
+                     <label key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', background: 'var(--bg-600)', padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, fontWeight: 'normal' }}>
+                       <input
+                         type="checkbox"
+                         checked={isPaid}
+                         onChange={() => toggleFormPack(idx)}
+                         style={{ width: 16, height: 16, cursor: 'pointer' }}
+                       />
+                       <span>Pack #{idx + 1}</span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+             )}
             <div className="form-group">
               <label>Notes</label>
               <input className="input" value={studentForm.notes} onChange={e => setStudentForm(f => ({ ...f, notes: e.target.value }))} />
