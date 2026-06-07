@@ -867,32 +867,31 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
     <div
       ref={(node) => { setDropRef(node); setDragRef(node); }}
       className={`time-slot occupied ${!lesson.made ? 'not-made' : ''} ${isDragging ? 'dragging' : ''}`}
-      style={{ cursor: 'grab', ...(isDragging ? { opacity: 0.4 } : {}), display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px' }}
+      style={{ cursor: 'grab', ...(isDragging ? { opacity: 0.4 } : {}) }}
       {...listeners}
       {...attributes}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
         <span className="slot-time">{time} - {endTimeStr}</span>
         {lesson.student?.instrument && <span className="tag tag-instrument" style={{ fontSize: 8, padding: '1px 4px' }}>{lesson.student.instrument}</span>}
       </div>
-      <div className="slot-student" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-          <span className="slot-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.student?.name}</span>
-          {rem <= 2 && (lesson.student?.totalLessons || 0) > 0 && (
-            <span style={{ fontSize: 9, color: 'var(--red)', marginLeft: 4 }}>⚠️</span>
-          )}
-          {lesson.student?.notes && (
-            <span title={lesson.student.notes} style={{ fontSize: 9, cursor: 'help', marginLeft: 4 }}>📝</span>
-          )}
-        </div>
-        
+      
+      <div className="slot-student" style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+        <span className="slot-name">{lesson.student?.name}</span>
+        {rem <= 2 && (lesson.student?.totalLessons || 0) > 0 && (
+          <span style={{ fontSize: 9, color: 'var(--red)' }}>⚠️</span>
+        )}
+        {lesson.student?.notes && (
+          <span title={lesson.student.notes} style={{ fontSize: 9, cursor: 'help' }}>📝</span>
+        )}
+
         {(() => {
           if (!lesson.student?.instrument) return null
           const matchingTeachers = teachers.filter(t => t.instrument === lesson.student?.instrument)
           if (matchingTeachers.length <= 1) return null
 
           return (
-            <div 
+            <span 
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -906,7 +905,7 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
                 alignItems: 'center', 
                 gap: '2px', 
                 background: 'var(--bg-600)', 
-                padding: '2px 6px', 
+                padding: '1px 4px', 
                 borderRadius: '4px', 
                 border: '1px solid var(--border)',
                 userSelect: 'none',
@@ -915,27 +914,25 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
               }}
               title="Click to assign or change teacher"
             >
-              🧑‍🏫 {lesson.teacher?.name || 'Assign Teacher'} ✏️
-            </div>
+              🧑‍🏫 {lesson.teacher?.name || 'Assign'} ✏️
+            </span>
           )
         })()}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-        <div>
-          {!lesson.made && <span className="not-made-label">Not Made</span>}
-        </div>
-        <div className="slot-actions" onClick={e => e.stopPropagation()}>
-          <button
-            className={`btn btn-sm ${lesson.made ? 'btn-ghost' : 'btn-danger'}`}
-            onClick={() => onToggleAttendance(lesson.id)}
-            title={lesson.made ? 'Mark as not made' : 'Mark as made'}
-            style={{ padding: '2px 6px', fontSize: 10 }}
-          >
-            {lesson.made ? '✓' : '✗'}
-          </button>
-          <button className="slot-remove" onClick={() => onEditDuration(lesson)} title="Edit Duration">⏱️</button>
-          <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
-        </div>
+
+      {!lesson.made && <span className="not-made-label">Not Made</span>}
+      
+      <div className="slot-actions">
+        <button
+          className={`btn btn-sm ${lesson.made ? 'btn-ghost' : 'btn-danger'}`}
+          onClick={() => onToggleAttendance(lesson.id)}
+          title={lesson.made ? 'Mark as not made' : 'Mark as made'}
+          style={{ padding: '2px 6px', fontSize: 10 }}
+        >
+          {lesson.made ? '✓' : '✗'}
+        </button>
+        <button className="slot-remove" onClick={() => onEditDuration(lesson)} title="Edit Duration">⏱️</button>
+        <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
       </div>
     </div>
   )
