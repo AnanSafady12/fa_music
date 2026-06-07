@@ -21,6 +21,9 @@ function getLessonMultiplier(startTime: string, endTime: string) {
   const duration = timeToMins(endTime) - timeToMins(startTime);
   return duration === 25 ? 0.5 : 1.0;
 }
+function getStudentLessonMultiplier(startTime: string, endTime: string) {
+  return 1.0;
+}
 
 // POST create a lesson in a room
 router.post('/', async (req, res) => {
@@ -66,7 +69,7 @@ router.post('/', async (req, res) => {
       })
 
       if (shouldProcess && studentId) {
-        const multiplier = getLessonMultiplier(startTime, endTime)
+        const multiplier = getStudentLessonMultiplier(startTime, endTime)
         await tx.student.update({
           where: { id: studentId },
           data: { completedLessons: { increment: multiplier } }
@@ -138,8 +141,8 @@ router.put('/:id', async (req, res) => {
       })
 
       if (oldLesson.isProcessed && oldLesson.made) {
-        const oldMult = getLessonMultiplier(oldLesson.startTime, oldLesson.endTime)
-        const newMult = getLessonMultiplier(startTime, endTime)
+        const oldMult = getStudentLessonMultiplier(oldLesson.startTime, oldLesson.endTime)
+        const newMult = getStudentLessonMultiplier(startTime, endTime)
 
         // If student changed
         if (oldLesson.studentId !== (studentId || null)) {
@@ -198,7 +201,7 @@ router.patch('/:id/attendance', async (req, res) => {
     const willBeMade = !lesson.made
     let increment = 0
     let setProcessed = lesson.isProcessed
-    const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
+    const multiplier = getStudentLessonMultiplier(lesson.startTime, lesson.endTime)
 
     // Logic:
     // If moving from Made -> Not Made AND isProcessed: DECREMENT, set isProcessed = false
@@ -241,7 +244,7 @@ router.delete('/:id', async (req, res) => {
 
     await prisma.$transaction(async (tx) => {
       if (lesson.isProcessed && lesson.made && lesson.studentId) {
-        const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
+        const multiplier = getStudentLessonMultiplier(lesson.startTime, lesson.endTime)
         await tx.student.update({
           where: { id: lesson.studentId },
           data: { completedLessons: { increment: -multiplier } }

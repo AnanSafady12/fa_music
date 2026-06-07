@@ -14,6 +14,10 @@ function getLessonMultiplier(startTime: string, endTime: string) {
   return duration === 25 ? 0.5 : 1.0;
 }
 
+function getStudentLessonMultiplier(startTime: string, endTime: string) {
+  return 1.0;
+}
+
 // Run every minute
 export function startCronJobs() {
   cron.schedule('* * * * *', async () => {
@@ -62,7 +66,7 @@ export function startCronJobs() {
             })
 
             if (lesson.studentId) {
-              const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
+              const multiplier = getStudentLessonMultiplier(lesson.startTime, lesson.endTime)
               await tx.student.update({
                 where: { id: lesson.studentId },
                 data: {
