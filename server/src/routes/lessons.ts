@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { getJerusalemTime } from '../utils/date'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -33,9 +34,7 @@ router.post('/', async (req, res) => {
     })
     if (!room) return res.status(404).json({ error: 'Room not found' })
 
-    const now = new Date()
-    const todayIso = now.toISOString().split('T')[0]
-    const nowMins = now.getHours() * 60 + now.getMinutes()
+    const { todayIso, nowMins } = getJerusalemTime()
     const scheduleDateIso = new Date(room.schedule.date).toISOString().split('T')[0]
     const [h, m] = endTime.split(':').map(Number)
     const lessonEndMins = h * 60 + m
@@ -184,9 +183,7 @@ router.patch('/:id/attendance', async (req, res) => {
     })
     if (!lesson) return res.status(404).json({ error: 'Lesson not found' })
 
-    const now = new Date()
-    const todayIso = now.toISOString().split('T')[0]
-    const nowMins = now.getHours() * 60 + now.getMinutes()
+    const { todayIso, nowMins } = getJerusalemTime()
     const scheduleDateIso = new Date(lesson.room.schedule.date).toISOString().split('T')[0]
     const [h, m] = lesson.endTime.split(':').map(Number)
     const lessonEndMins = h * 60 + m

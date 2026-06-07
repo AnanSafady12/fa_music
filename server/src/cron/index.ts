@@ -1,5 +1,6 @@
 import cron from 'node-cron'
 import { PrismaClient } from '@prisma/client'
+import { getJerusalemTime } from '../utils/date'
 
 const prisma = new PrismaClient()
 
@@ -32,11 +33,9 @@ export function startCronJobs() {
         }
       })
 
-      const now = new Date()
-      const todayIso = now.toISOString().split('T')[0]
-      const nowMins = now.getHours() * 60 + now.getMinutes()
+      const { todayIso, nowMins } = getJerusalemTime()
 
-      console.log(`[Cron] Checking ${unprocessedLessons.length} unprocessed lessons at ${now.toISOString()}`)
+      console.log(`[Cron] Checking ${unprocessedLessons.length} unprocessed lessons. Local Today: ${todayIso}, mins: ${nowMins}`)
 
       for (const lesson of unprocessedLessons) {
         const scheduleDateIso = new Date(lesson.room.schedule.date).toISOString().split('T')[0]
@@ -47,7 +46,7 @@ export function startCronJobs() {
         if (scheduleDateIso < todayIso) {
           isPast = true
         } else if (scheduleDateIso === todayIso) {
-          // If it's today, check if the end time has passed (using server local hours)
+          // If it's today, check if the end time has passed (using local hours)
           if (lessonEndMins <= nowMins) {
             isPast = true
           }

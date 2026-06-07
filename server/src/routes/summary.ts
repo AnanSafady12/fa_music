@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { getJerusalemTime } from '../utils/date'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -70,9 +71,7 @@ router.get('/', async (req, res) => {
       }
     })
 
-    const now = new Date()
-    const todayIso = now.toISOString().split('T')[0]
-    const nowMins = now.getHours() * 60 + now.getMinutes()
+    const { todayIso, nowMins } = getJerusalemTime()
 
     // Filter for lessons that have actually finished
     const processedLessons = lessons.filter(lesson => {

@@ -139,6 +139,7 @@ export default function SchedulePage() {
         await createLesson({ roomId, studentId, teacherId, startTime: time, endTime: newEnd, isBreak: false })
       }
       await loadSchedule(selectedDate)
+      await loadStudents()
     } catch (err) {
       console.error(err)
     } finally {
@@ -236,12 +237,20 @@ export default function SchedulePage() {
 
   const handleRemoveLesson = async (lessonId: number) => {
     setSaving(true)
-    try { await deleteLesson(lessonId); await loadSchedule(selectedDate) } finally { setSaving(false) }
+    try {
+      await deleteLesson(lessonId)
+      await loadSchedule(selectedDate)
+      await loadStudents()
+    } finally { setSaving(false) }
   }
 
   const handleToggleAttendance = async (lessonId: number) => {
     setSaving(true)
-    try { await toggleAttendance(lessonId); await loadSchedule(selectedDate) } finally { setSaving(false) }
+    try {
+      await toggleAttendance(lessonId)
+      await loadSchedule(selectedDate)
+      await loadStudents()
+    } finally { setSaving(false) }
   }
 
   const handleEditDurationSubmit = async () => {
@@ -291,6 +300,7 @@ export default function SchedulePage() {
       console.error(e)
     } finally {
       await loadSchedule(selectedDate)
+      await loadStudents()
       setSaving(false)
       setDurationModal(null)
     }
@@ -304,6 +314,7 @@ export default function SchedulePage() {
     await copyLastWeek(prev.id, { targetDate: selectedDate, targetDayName: derivedDayName })
     await loadSchedule(selectedDate)
     await loadAllSchedules()
+    await loadStudents()
   }
 
   const handleAddBreak = async () => {
