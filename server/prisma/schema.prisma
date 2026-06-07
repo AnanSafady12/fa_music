@@ -122,6 +122,7 @@ model Lesson {
   endTime   String
   made      Boolean  @default(true)
   isProcessed Boolean @default(false)
+  reminderSent Boolean @default(false)
   isBreak   Boolean  @default(false)
   breakLabel String?
   createdAt DateTime @default(now())

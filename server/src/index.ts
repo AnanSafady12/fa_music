@@ -11,6 +11,7 @@ import todosRouter from './routes/todos'
 import authRouter from './routes/auth'
 import { authMiddleware } from './middleware/authMiddleware'
 import { startCronJobs } from './cron'
+import { startWhatsAppCronJob } from './cron/whatsappCron'
 
 dotenv.config()
 
@@ -35,6 +36,7 @@ app.use('/api/todos', authMiddleware, todosRouter)
 
 // Automatically process lessons whose end time has passed
 startCronJobs()
+startWhatsAppCronJob()
 
 app.listen(PORT, () => {
   console.log(`FA Music server running on http://localhost:${PORT}`)
