@@ -152,9 +152,9 @@ export default function StudentsPage() {
   const renewPack = async (s: Student) => {
     if (!confirm(`Renew packet for ${s.name}? This will add 4 lessons and set status to Unpaid.`)) return
     const newTotal = s.totalLessons + 4
-    const parts = s.paidPacks ? s.paidPacks.split(',') : []
-    parts.push('0')
-    const newPaidPacks = parts.join(',')
+    const currentPacks = getStudentPacks(s)
+    currentPacks.push(false)
+    const newPaidPacks = currentPacks.map(v => v ? '1' : '0').join(',')
     setStudents(prev => prev.map(st => st.id === s.id ? { ...st, totalLessons: newTotal, paidPacks: newPaidPacks, hasPaid: false } : st))
     await updateStudent(s.id, { ...s, totalLessons: newTotal, paidPacks: newPaidPacks, hasPaid: false })
   }
