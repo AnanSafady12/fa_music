@@ -62,7 +62,9 @@ router.get('/logs', async (req, res) => {
     let whereClause: any = { workerId: worker.id }
     if (month !== null && year !== null) {
       const startDate = new Date(Date.UTC(year, month - 1, 1))
+      startDate.setUTCDate(startDate.getUTCDate() - 2) // safety buffer
       const endDate = new Date(Date.UTC(year, month, 1))
+      endDate.setUTCDate(endDate.getUTCDate() + 2) // safety buffer
       whereClause.date = {
         gte: startDate,
         lt: endDate
@@ -73,7 +75,30 @@ router.get('/logs', async (req, res) => {
       where: whereClause,
       orderBy: { date: 'asc' }
     })
-    res.json(logs)
+
+    let filteredLogs = logs
+    if (month !== null && year !== null) {
+      filteredLogs = logs.filter(log => {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Jerusalem',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        const parts = formatter.formatToParts(new Date(log.date));
+        const partMap: Record<string, string> = {};
+        for (const part of parts) {
+          partMap[part.type] = part.value;
+        }
+        
+        const logYear = Number(partMap.year);
+        const logMonth = Number(partMap.month);
+        
+        return logMonth === month && logYear === year;
+      })
+    }
+
+    res.json(filteredLogs)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Failed to fetch worker logs' })

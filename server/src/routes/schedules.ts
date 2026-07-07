@@ -97,13 +97,41 @@ router.post('/:id/copy-last-week', async (req, res) => {
 
     const targetFull = await prisma.schedule.findUnique({
       where: { id: (target as any).id },
-      include: { rooms: true }
+      include: { rooms: { include: { lessons: true } } }
     })
 
-    // Copy lessons from each room to corresponding target room
-    for (let i = 0; i < source.rooms.length && i < (targetFull!.rooms.length); i++) {
-      const srcRoom = source.rooms[i]
-      const tgtRoom = targetFull!.rooms[i]
+    // Clean up existing lessons in the target rooms first, and handle student completed lessons counts
+    const targetRoomIds = targetFull!.rooms.map(r => r.id)
+    const existingLessons = await prisma.lesson.findMany({
+      where: { roomId: { in: targetRoomIds } }
+    })
+
+    await prisma.$transaction(async (tx) => {
+      for (const lesson of existingLessons) {
+        if (lesson.isProcessed && lesson.made && lesson.studentId) {
+          await tx.student.update({
+            where: { id: lesson.studentId },
+            data: { completedLessons: { decrement: 1.0 } }
+          })
+        }
+      }
+      await tx.lesson.deleteMany({
+        where: { roomId: { in: targetRoomIds } }
+      })
+    })
+
+    // Copy lessons from source to corresponding matched-by-name rooms in target
+    for (const srcRoom of source.rooms) {
+      let tgtRoom = targetFull!.rooms.find(r => r.name === srcRoom.name)
+      if (!tgtRoom) {
+        tgtRoom = await prisma.room.create({
+          data: {
+            name: srcRoom.name,
+            scheduleId: targetFull!.id
+          }
+        }) as any
+      }
+
       for (const lesson of srcRoom.lessons) {
         await prisma.lesson.create({
           data: {

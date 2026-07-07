@@ -14,8 +14,8 @@ export function getJerusalemTime() {
     partMap[part.type] = part.value;
   }
   const y = partMap.year;
-  const m = partMap.month;
-  const d = partMap.day;
+  const m = String(partMap.month).padStart(2, '0');
+  const d = String(partMap.day).padStart(2, '0');
   const hour = parseInt(partMap.hour || '0', 10);
   const minute = parseInt(partMap.minute || '0', 10);
   
@@ -23,3 +23,4 @@ export function getJerusalemTime() {
   const nowMins = hour * 60 + minute;
   return { todayIso, nowMins };
 }
+

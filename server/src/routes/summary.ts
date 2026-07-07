@@ -50,7 +50,9 @@ router.get('/', async (req, res) => {
 
     if (month !== null && year !== null) {
       const startDate = new Date(Date.UTC(year, month - 1, 1))
+      startDate.setUTCDate(startDate.getUTCDate() - 2) // safety buffer
       const endDate = new Date(Date.UTC(year, month, 1))
+      endDate.setUTCDate(endDate.getUTCDate() + 2) // safety buffer
       baseWhere.room = {
         schedule: {
           date: {
@@ -73,9 +75,28 @@ router.get('/', async (req, res) => {
 
     const { todayIso, nowMins } = getJerusalemTime()
 
-    // Filter for lessons that have actually finished
+    // Filter for lessons that belong to the correct month/year in Jerusalem local time and have actually finished
     const processedLessons = lessons.filter(lesson => {
-      const scheduleDateIso = new Date(lesson.room.schedule.date).toISOString().split('T')[0]
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Jerusalem',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const parts = formatter.formatToParts(new Date(lesson.room.schedule.date));
+      const partMap: Record<string, string> = {};
+      for (const part of parts) {
+        partMap[part.type] = part.value;
+      }
+      
+      const lessonYear = Number(partMap.year);
+      const lessonMonth = Number(partMap.month);
+      
+      // Strict calendar month/year filter
+      if (month !== null && lessonMonth !== month) return false;
+      if (year !== null && lessonYear !== year) return false;
+
+      const scheduleDateIso = `${partMap.year}-${partMap.month}-${partMap.day}`;
       const [h, m] = lesson.endTime.split(':').map(Number)
       const lessonEndMins = h * 60 + m
 
@@ -122,7 +143,10 @@ router.get('/', async (req, res) => {
     let workerLiability = 0
     if (month !== null && year !== null) {
       const startDate = new Date(Date.UTC(year, month - 1, 1))
+      startDate.setUTCDate(startDate.getUTCDate() - 2) // safety buffer
       const endDate = new Date(Date.UTC(year, month, 1))
+      endDate.setUTCDate(endDate.getUTCDate() + 2) // safety buffer
+      
       const logs = await prisma.workerLog.findMany({
         where: {
           workerId: worker.id,
@@ -132,9 +156,31 @@ router.get('/', async (req, res) => {
           }
         }
       })
-      workerHours = logs.reduce((sum, log) => sum + log.hours, 0)
-      workerLiability = logs.reduce((sum, log) => sum + (log.hours * log.costPerHour), 0)
+
+      // Filter in memory by local Jerusalem timezone
+      const filteredLogs = logs.filter(log => {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Jerusalem',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        const parts = formatter.formatToParts(new Date(log.date));
+        const partMap: Record<string, string> = {};
+        for (const part of parts) {
+          partMap[part.type] = part.value;
+        }
+        
+        const logYear = Number(partMap.year);
+        const logMonth = Number(partMap.month);
+        
+        return logMonth === month && logYear === year;
+      })
+
+      workerHours = filteredLogs.reduce((sum, log) => sum + log.hours, 0)
+      workerLiability = filteredLogs.reduce((sum, log) => sum + (log.hours * log.costPerHour), 0)
     }
+
 
     const totalTeacherLiabilities = teacherSalaries.reduce((sum, t) => sum + t.earnedSalary, 0)
     const grandTotalLiabilities = totalTeacherLiabilities + workerLiability

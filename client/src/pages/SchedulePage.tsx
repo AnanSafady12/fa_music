@@ -308,13 +308,31 @@ export default function SchedulePage() {
 
   const handleCopyLastWeek = async () => {
     if (!allSchedules.length) return
+    const targetDayOfWeek = new Date(selectedDate + 'T12:00:00Z').getUTCDay()
     const sorted = [...allSchedules].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    const prev = sorted.find(s => s.date.split('T')[0] !== selectedDate)
-    if (!prev) return alert('Could not find previous schedule to copy.')
-    await copyLastWeek(prev.id, { targetDate: selectedDate, targetDayName: derivedDayName })
-    await loadSchedule(selectedDate)
-    await loadAllSchedules()
-    await loadStudents()
+    const prev = sorted.find(s => {
+      const sDate = s.date.split('T')[0]
+      if (sDate >= selectedDate) return false
+      const sDayOfWeek = new Date(s.date).getUTCDay()
+      return sDayOfWeek === targetDayOfWeek
+    })
+    if (!prev) return alert('Could not find a previous schedule for this weekday to copy.')
+
+    if (schedule && schedule.rooms.some(r => r.lessons.length > 0)) {
+      if (!confirm('This day already has lessons. Copying will overwrite them. Do you want to proceed?')) {
+        return
+      }
+    }
+
+    try {
+      await copyLastWeek(prev.id, { targetDate: selectedDate, targetDayName: derivedDayName })
+      await loadSchedule(selectedDate)
+      await loadAllSchedules()
+      await loadStudents()
+    } catch (err) {
+      console.error(err)
+      alert('Failed to copy last week schedule.')
+    }
   }
 
   const handleAddBreak = async () => {
