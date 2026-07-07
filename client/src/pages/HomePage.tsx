@@ -35,7 +35,7 @@ export default function HomePage() {
 
   // Local state for editing teacher notes/salary
   const [editingTeacherId, setEditingTeacherId] = useState<number | null>(null)
-  const [teacherForm, setTeacherForm] = useState({ notes: '', manualSalary: '' as string | number })
+  const [teacherForm, setTeacherForm] = useState({ notes: '', manualSalary: '' as string | number, lessonsTaught: '' as string | number })
 
   const load = () => {
     setLoading(true)
@@ -129,7 +129,7 @@ export default function HomePage() {
 
   const startEditTeacher = (t: any) => {
     setEditingTeacherId(t.id)
-    setTeacherForm({ notes: t.notes || '', manualSalary: t.earnedSalary })
+    setTeacherForm({ notes: t.notes || '', manualSalary: t.earnedSalary, lessonsTaught: t.lessonsTaught })
   }
 
   const saveTeacherStats = async () => {
@@ -230,7 +230,26 @@ export default function HomePage() {
                 <tr key={t.id}>
                   <td style={{ fontWeight: 600 }}>{t.name}</td>
                   <td style={{ color: 'var(--text-muted)' }}>₪{t.costPerLesson}</td>
-                  <td>{t.lessonsTaught}</td>
+                  <td>
+                    {editingTeacherId === t.id ? (
+                      <input 
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        className="input" 
+                        style={{ width: 80, padding: '4px 8px' }}
+                        value={teacherForm.lessonsTaught}
+                        onChange={e => {
+                          const val = e.target.value
+                          const lessons = val === '' ? '' : Number(val)
+                          const salary = val === '' ? '' : lessons * t.costPerLesson
+                          setTeacherForm(f => ({ ...f, lessonsTaught: val, manualSalary: salary }))
+                        }}
+                      />
+                    ) : (
+                      t.lessonsTaught
+                    )}
+                  </td>
                   <td>
                     {editingTeacherId === t.id ? (
                       <input 
@@ -238,7 +257,12 @@ export default function HomePage() {
                         className="input" 
                         style={{ width: 100, padding: '4px 8px' }}
                         value={teacherForm.manualSalary}
-                        onChange={e => setTeacherForm(f => ({ ...f, manualSalary: e.target.value }))}
+                        onChange={e => {
+                          const val = e.target.value
+                          const salary = val === '' ? '' : Number(val)
+                          const lessons = val === '' ? '' : (t.costPerLesson > 0 ? salary / t.costPerLesson : 0)
+                          setTeacherForm(f => ({ ...f, manualSalary: val, lessonsTaught: lessons }))
+                        }}
                       />
                     ) : (
                       <span style={{ color: 'var(--accent)', fontWeight: 700 }}>₪{t.earnedSalary}</span>
