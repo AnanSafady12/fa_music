@@ -241,9 +241,13 @@ export default function HomePage() {
                         value={teacherForm.lessonsTaught}
                         onChange={e => {
                           const val = e.target.value
-                          const lessons = val === '' ? '' : Number(val)
-                          const salary = val === '' ? '' : lessons * t.costPerLesson
-                          setTeacherForm(f => ({ ...f, lessonsTaught: val, manualSalary: salary }))
+                          if (val === '') {
+                            setTeacherForm(f => ({ ...f, lessonsTaught: '', manualSalary: '' }))
+                          } else {
+                            const lessons = Number(val)
+                            const salary = lessons * t.costPerLesson
+                            setTeacherForm(f => ({ ...f, lessonsTaught: val, manualSalary: salary }))
+                          }
                         }}
                       />
                     ) : (
@@ -259,9 +263,13 @@ export default function HomePage() {
                         value={teacherForm.manualSalary}
                         onChange={e => {
                           const val = e.target.value
-                          const salary = val === '' ? '' : Number(val)
-                          const lessons = val === '' ? '' : (t.costPerLesson > 0 ? salary / t.costPerLesson : 0)
-                          setTeacherForm(f => ({ ...f, manualSalary: val, lessonsTaught: lessons }))
+                          if (val === '') {
+                            setTeacherForm(f => ({ ...f, manualSalary: '', lessonsTaught: '' }))
+                          } else {
+                            const salary = Number(val)
+                            const lessons = t.costPerLesson > 0 ? salary / t.costPerLesson : 0
+                            setTeacherForm(f => ({ ...f, manualSalary: val, lessonsTaught: lessons }))
+                          }
                         }}
                       />
                     ) : (
