@@ -181,15 +181,12 @@ router.get('/', async (req, res) => {
 
       const calculatedSalary = lessonsTaught * teacher.costPerLesson
       const earnedSalary = stats?.manualSalary !== null && stats?.manualSalary !== undefined ? stats.manualSalary : calculatedSalary
-      const displayLessonsTaught = stats?.manualSalary !== null && stats?.manualSalary !== undefined 
-        ? (teacher.costPerLesson > 0 ? stats.manualSalary / teacher.costPerLesson : 0)
-        : lessonsTaught
 
       return {
         id: teacher.id,
         name: teacher.name,
         instrument: teacher.instrument || 'None',
-        lessonsTaught: displayLessonsTaught,
+        lessonsTaught: lessonsTaught,
         costPerLesson: teacher.costPerLesson,
         calculatedSalary,
         earnedSalary,
