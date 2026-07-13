@@ -120,6 +120,47 @@ router.post('/:id/copy-last-week', async (req, res) => {
       })
     })
 
+    // Fetch all historical student-teacher assignments to determine regular teachers
+    const historicalAssignments = await prisma.lesson.findMany({
+      where: {
+        teacherId: { not: null },
+        studentId: { not: null }
+      },
+      select: {
+        studentId: true,
+        teacherId: true
+      }
+    })
+
+    const studentTeacherMap: Record<number, number> = {}
+    const studentTeacherCounts: Record<number, Record<number, number>> = {}
+    for (const assignment of historicalAssignments) {
+      const sid = assignment.studentId!
+      const tid = assignment.teacherId!
+      if (!studentTeacherCounts[sid]) {
+        studentTeacherCounts[sid] = {}
+      }
+      studentTeacherCounts[sid][tid] = (studentTeacherCounts[sid][tid] || 0) + 1
+    }
+    for (const [sidStr, counts] of Object.entries(studentTeacherCounts)) {
+      const sid = Number(sidStr)
+      let bestTid = null
+      let maxCount = 0
+      for (const [tidStr, count] of Object.entries(counts)) {
+        const tid = Number(tidStr)
+        if (count > maxCount) {
+          maxCount = count
+          bestTid = tid
+        }
+      }
+      if (bestTid !== null) {
+        studentTeacherMap[sid] = bestTid
+      }
+    }
+
+    const teachers = await prisma.teacher.findMany()
+    const students = await prisma.student.findMany()
+
     // Copy lessons from source to corresponding matched-by-name rooms in target
     for (const srcRoom of source.rooms) {
       let tgtRoom = targetFull!.rooms.find(r => r.name === srcRoom.name)
@@ -133,11 +174,25 @@ router.post('/:id/copy-last-week', async (req, res) => {
       }
 
       for (const lesson of srcRoom.lessons) {
+        let resolvedTeacherId = lesson.teacherId
+        if (resolvedTeacherId === null && lesson.studentId !== null) {
+          resolvedTeacherId = studentTeacherMap[lesson.studentId!] || null
+          if (resolvedTeacherId === null) {
+            const student = students.find(s => s.id === lesson.studentId)
+            if (student && student.instrument) {
+              const sameInstrumentTeachers = teachers.filter(t => t.instrument === student.instrument)
+              if (sameInstrumentTeachers.length === 1) {
+                resolvedTeacherId = sameInstrumentTeachers[0].id
+              }
+            }
+          }
+        }
+
         await prisma.lesson.create({
           data: {
             roomId: tgtRoom.id,
             studentId: lesson.studentId,
-            teacherId: lesson.teacherId,
+            teacherId: resolvedTeacherId,
             startTime: lesson.startTime,
             endTime: lesson.endTime,
             made: true,

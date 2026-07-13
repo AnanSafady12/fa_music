@@ -18,7 +18,8 @@ function addMins(t: string, mins: number) {
   return minsToTime(timeToMins(t) + mins);
 }
 function getLessonMultiplier(startTime: string, endTime: string) {
-  return 1.0;
+  const duration = timeToMins(endTime) - timeToMins(startTime);
+  return duration === 25 ? 0.5 : 1.0;
 }
 
 // POST create a lesson in a room
@@ -130,34 +131,42 @@ router.put('/:id', async (req, res) => {
     if (!oldLesson) return res.status(404).json({ error: 'Lesson not found' })
 
     const lesson = await prisma.$transaction(async (tx) => {
+      const updateData: any = { roomId, startTime, endTime, isBreak, breakLabel }
+      if (studentId !== undefined) updateData.studentId = studentId || null
+      if (teacherId !== undefined) updateData.teacherId = teacherId || null
+
       const l = await tx.lesson.update({
         where: { id },
-        data: { roomId, studentId: studentId || null, teacherId: teacherId || null, startTime, endTime, isBreak, breakLabel },
+        data: updateData,
         include: { student: true, teacher: true }
       })
 
       if (oldLesson.isProcessed && oldLesson.made) {
         const oldMult = getLessonMultiplier(oldLesson.startTime, oldLesson.endTime)
-        const newMult = getLessonMultiplier(startTime, endTime)
+        const finalStart = startTime !== undefined ? startTime : oldLesson.startTime
+        const finalEnd = endTime !== undefined ? endTime : oldLesson.endTime
+        const newMult = getLessonMultiplier(finalStart, finalEnd)
+
+        const finalStudentId = studentId !== undefined ? (studentId || null) : oldLesson.studentId
 
         // If student changed
-        if (oldLesson.studentId !== (studentId || null)) {
+        if (oldLesson.studentId !== finalStudentId) {
           if (oldLesson.studentId) {
             await tx.student.update({
               where: { id: oldLesson.studentId },
               data: { completedLessons: { decrement: oldMult } }
             })
           }
-          if (studentId) {
+          if (finalStudentId) {
             await tx.student.update({
-              where: { id: studentId },
+              where: { id: finalStudentId },
               data: { completedLessons: { increment: newMult } }
             })
           }
-        } else if (studentId && oldMult !== newMult) {
+        } else if (finalStudentId && oldMult !== newMult) {
           // Same student, but duration changed
           await tx.student.update({
-            where: { id: studentId },
+            where: { id: finalStudentId },
             data: { completedLessons: { increment: newMult - oldMult } }
           })
         }

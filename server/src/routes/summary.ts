@@ -105,6 +105,44 @@ router.get('/', async (req, res) => {
       return false
     })
 
+    // 4b. Fetch all historical student-teacher assignments to determine regular teachers
+    const historicalAssignments = await prisma.lesson.findMany({
+      where: {
+        teacherId: { not: null },
+        studentId: { not: null }
+      },
+      select: {
+        studentId: true,
+        teacherId: true
+      }
+    })
+
+    const studentTeacherMap: Record<number, number> = {}
+    const studentTeacherCounts: Record<number, Record<number, number>> = {}
+    for (const assignment of historicalAssignments) {
+      const sid = assignment.studentId!
+      const tid = assignment.teacherId!
+      if (!studentTeacherCounts[sid]) {
+        studentTeacherCounts[sid] = {}
+      }
+      studentTeacherCounts[sid][tid] = (studentTeacherCounts[sid][tid] || 0) + 1
+    }
+    for (const [sidStr, counts] of Object.entries(studentTeacherCounts)) {
+      const sid = Number(sidStr)
+      let bestTid = null
+      let maxCount = 0
+      for (const [tidStr, count] of Object.entries(counts)) {
+        const tid = Number(tidStr)
+        if (count > maxCount) {
+          maxCount = count
+          bestTid = tid
+        }
+      }
+      if (bestTid !== null) {
+        studentTeacherMap[sid] = bestTid
+      }
+    }
+
     // 5. Calculate teacher salaries
     const teacherSalaries = teachers.map(teacher => {
       const stats = teacher.monthlyStats[0] || null
@@ -112,9 +150,15 @@ router.get('/', async (req, res) => {
       let lessonsTaught = 0
       for (const lesson of processedLessons) {
         const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
-        if (lesson.teacherId === teacher.id) {
+        
+        let resolvedTeacherId = lesson.teacherId
+        if (resolvedTeacherId === null && lesson.studentId !== null) {
+          resolvedTeacherId = studentTeacherMap[lesson.studentId!] || null
+        }
+
+        if (resolvedTeacherId === teacher.id) {
           lessonsTaught += multiplier
-        } else if (lesson.teacherId === null && lesson.student?.instrument === teacher.instrument) {
+        } else if (resolvedTeacherId === null && lesson.student?.instrument === teacher.instrument) {
           // Legacy fallback: attribute lesson if this is the ONLY teacher for that instrument
           const sameInstrumentTeachers = teachers.filter(t => t.instrument === teacher.instrument)
           if (sameInstrumentTeachers.length === 1) {

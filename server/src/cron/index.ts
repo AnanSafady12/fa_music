@@ -10,7 +10,8 @@ function timeToMins(t: string) {
 }
 
 function getLessonMultiplier(startTime: string, endTime: string) {
-  return 1.0;
+  const duration = timeToMins(endTime) - timeToMins(startTime);
+  return duration === 25 ? 0.5 : 1.0;
 }
 
 // Run every minute
