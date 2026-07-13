@@ -295,4 +295,175 @@ router.put('/teacher-stats', async (req, res) => {
   }
 })
 
+// Debug endpoint for July calculations
+router.get('/debug-july', async (req, res) => {
+  try {
+    const password = req.query.password
+    if (password !== 'admin123') {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const month = 7
+    const year = 2026
+
+    const teachers = await prisma.teacher.findMany()
+    const baseWhere: any = {
+      made: true,
+      isBreak: false,
+      studentId: { not: null }
+    }
+
+    const startDate = new Date(Date.UTC(year, month - 1, 1))
+    startDate.setUTCDate(startDate.getUTCDate() - 2)
+    const endDate = new Date(Date.UTC(year, month, 1))
+    endDate.setUTCDate(endDate.getUTCDate() + 2)
+    baseWhere.room = {
+      schedule: {
+        date: {
+          gte: startDate,
+          lt: endDate
+        }
+      }
+    }
+
+    const lessons = await prisma.lesson.findMany({
+      where: baseWhere,
+      include: {
+        student: true,
+        teacher: true,
+        room: { include: { schedule: true } }
+      }
+    })
+
+    const julyLessons = lessons.filter(lesson => {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Jerusalem',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+      const parts = formatter.formatToParts(new Date(lesson.room.schedule.date))
+      const partMap: Record<string, string> = {}
+      for (const part of parts) {
+        partMap[part.type] = part.value
+      }
+      return Number(partMap.month) === month && Number(partMap.year) === year
+    })
+
+    // Regular teacher map
+    const historicalAssignments = await prisma.lesson.findMany({
+      where: {
+        teacherId: { not: null },
+        studentId: { not: null }
+      },
+      select: {
+        studentId: true,
+        teacherId: true
+      }
+    })
+
+    const studentTeacherMap: Record<number, number> = {}
+    const studentTeacherCounts: Record<number, Record<number, number>> = {}
+    for (const assignment of historicalAssignments) {
+      const sid = assignment.studentId!
+      const tid = assignment.teacherId!
+      if (!studentTeacherCounts[sid]) {
+        studentTeacherCounts[sid] = {}
+      }
+      studentTeacherCounts[sid][tid] = (studentTeacherCounts[sid][tid] || 0) + 1
+    }
+    for (const [sidStr, counts] of Object.entries(studentTeacherCounts)) {
+      const sid = Number(sidStr)
+      let bestTid = null
+      let maxCount = 0
+      for (const [tidStr, count] of Object.entries(counts)) {
+        const tid = Number(tidStr)
+        if (count > maxCount) {
+          maxCount = count
+          bestTid = tid
+        }
+      }
+      if (bestTid !== null) {
+        studentTeacherMap[sid] = bestTid
+      }
+    }
+
+    const analyzedLessons = julyLessons.map(l => {
+      const duration = (t1, t2) => {
+        const timeToMins = (t) => {
+          const [h, m] = t.split(':').map(Number)
+          return h * 60 + m
+        }
+        return timeToMins(t2) - timeToMins(t1)
+      }
+      const mult = duration(l.startTime, l.endTime) === 25 ? 0.5 : 1.0
+
+      let resolvedTeacherId = l.teacherId
+      let method = 'Explicitly Assigned'
+
+      if (resolvedTeacherId === null && l.studentId !== null) {
+        resolvedTeacherId = studentTeacherMap[l.studentId!] || null
+        method = resolvedTeacherId ? 'Resolved via student history' : 'No history'
+
+        if (resolvedTeacherId === null && l.student?.instrument) {
+          const sameInstrumentTeachers = teachers.filter(t => t.instrument === l.student!.instrument)
+          if (sameInstrumentTeachers.length === 1) {
+            resolvedTeacherId = sameInstrumentTeachers[0].id
+            method = 'Resolved via single teacher fallback'
+          } else {
+            method = `Failed: Multiple teachers (${sameInstrumentTeachers.length}) exist for ${l.student.instrument}`
+          }
+        }
+      }
+
+      if (resolvedTeacherId === null && l.room?.name) {
+        const roomNameLower = l.room.name.toLowerCase()
+        const matchedTeacher = teachers.find(t => {
+          const nameParts = t.name.toLowerCase().split(/\s+/)
+          return roomNameLower.includes(t.name.toLowerCase()) || 
+                 nameParts.some(part => part.length > 2 && roomNameLower.includes(part))
+        })
+        if (matchedTeacher) {
+          resolvedTeacherId = matchedTeacher.id
+          method = `Resolved via Room Name match: "${l.room.name}" -> "${matchedTeacher.name}"`
+        }
+      }
+
+      const assignedTeacherName = l.teacher ? l.teacher.name : null
+      const resolvedTeacherName = resolvedTeacherId ? (teachers.find(t => t.id === resolvedTeacherId)?.name || 'Unknown') : null
+
+      return {
+        lessonId: l.id,
+        date: new Date(l.room.schedule.date).toISOString().split('T')[0],
+        time: `${l.startTime}-${l.endTime}`,
+        student: l.student ? { name: l.student.name, instrument: l.student.instrument } : null,
+        assignedTeacherName,
+        resolvedTeacherName,
+        method,
+        multiplier: mult
+      }
+    })
+
+    const teacherTotals: Record<string, { name: string, total: number }> = {}
+    for (const t of teachers) {
+      teacherTotals[t.id] = { name: t.name, total: 0 }
+    }
+    for (const al of analyzedLessons) {
+      const matched = teachers.find(t => t.name === al.resolvedTeacherName)
+      if (matched) {
+        teacherTotals[matched.id].total += al.multiplier
+      }
+    }
+
+    res.json({
+      registeredTeachers: teachers.map(t => ({ id: t.id, name: t.name, instrument: t.instrument })),
+      studentTeacherMap,
+      teacherTotals,
+      lessons: analyzedLessons
+    })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 export default router
