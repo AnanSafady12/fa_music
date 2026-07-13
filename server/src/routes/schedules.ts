@@ -188,6 +188,14 @@ router.post('/:id/copy-last-week', async (req, res) => {
           }
         }
 
+        if (resolvedTeacherId === null && srcRoom.name) {
+          const roomNameLower = srcRoom.name.toLowerCase()
+          const matchedTeacher = teachers.find(t => roomNameLower.includes(t.name.toLowerCase()))
+          if (matchedTeacher) {
+            resolvedTeacherId = matchedTeacher.id
+          }
+        }
+
         await prisma.lesson.create({
           data: {
             roomId: tgtRoom.id,

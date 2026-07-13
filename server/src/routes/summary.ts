@@ -156,6 +156,14 @@ router.get('/', async (req, res) => {
           resolvedTeacherId = studentTeacherMap[lesson.studentId!] || null
         }
 
+        if (resolvedTeacherId === null && lesson.room?.name) {
+          const roomNameLower = lesson.room.name.toLowerCase()
+          const matchedTeacher = teachers.find(t => roomNameLower.includes(t.name.toLowerCase()))
+          if (matchedTeacher) {
+            resolvedTeacherId = matchedTeacher.id
+          }
+        }
+
         if (resolvedTeacherId === teacher.id) {
           lessonsTaught += multiplier
         } else if (resolvedTeacherId === null && lesson.student?.instrument === teacher.instrument) {
