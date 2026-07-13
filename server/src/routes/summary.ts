@@ -158,7 +158,11 @@ router.get('/', async (req, res) => {
 
         if (resolvedTeacherId === null && lesson.room?.name) {
           const roomNameLower = lesson.room.name.toLowerCase()
-          const matchedTeacher = teachers.find(t => roomNameLower.includes(t.name.toLowerCase()))
+          const matchedTeacher = teachers.find(t => {
+            const nameParts = t.name.toLowerCase().split(/\s+/)
+            return roomNameLower.includes(t.name.toLowerCase()) || 
+                   nameParts.some(part => part.length > 2 && roomNameLower.includes(part))
+          })
           if (matchedTeacher) {
             resolvedTeacherId = matchedTeacher.id
           }

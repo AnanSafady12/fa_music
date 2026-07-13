@@ -190,7 +190,11 @@ router.post('/:id/copy-last-week', async (req, res) => {
 
         if (resolvedTeacherId === null && srcRoom.name) {
           const roomNameLower = srcRoom.name.toLowerCase()
-          const matchedTeacher = teachers.find(t => roomNameLower.includes(t.name.toLowerCase()))
+          const matchedTeacher = teachers.find(t => {
+            const nameParts = t.name.toLowerCase().split(/\s+/)
+            return roomNameLower.includes(t.name.toLowerCase()) || 
+                   nameParts.some(part => part.length > 2 && roomNameLower.includes(part))
+          })
           if (matchedTeacher) {
             resolvedTeacherId = matchedTeacher.id
           }
