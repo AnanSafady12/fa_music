@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSummary, updateWorker, getWorkerLogs, createWorkerLog, updateWorkerLog, deleteWorkerLog } from '../api'
+import { getSummary, updateTeacherStats, updateWorker, getWorkerLogs, createWorkerLog, updateWorkerLog, deleteWorkerLog } from '../api'
 import './HomePage.css'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -32,6 +32,9 @@ export default function HomePage() {
     costPerHour: '',
     notes: ''
   })
+  // Local state for editing teacher notes
+  const [editingTeacherId, setEditingTeacherId] = useState<number | null>(null)
+  const [teacherNotes, setTeacherNotes] = useState('')
 
 
 
@@ -125,7 +128,23 @@ export default function HomePage() {
     }
   }
 
+  const startEditNotes = (t: any) => {
+    setEditingTeacherId(t.id)
+    setTeacherNotes(t.notes || '')
+  }
 
+  const saveTeacherNotes = async () => {
+    if (editingTeacherId === null) return
+    await updateTeacherStats({
+      teacherId: editingTeacherId,
+      month: selectedMonth,
+      year: selectedYear,
+      notes: teacherNotes,
+      manualSalary: null
+    })
+    setEditingTeacherId(null)
+    load()
+  }
 
   if (loading) {
     return <div className="page-loading">Loading Dashboard...</div>
@@ -204,6 +223,7 @@ export default function HomePage() {
                 <th>Lessons Taught</th>
                 <th>Total Salary</th>
                 <th>Notes</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -216,7 +236,27 @@ export default function HomePage() {
                     <span style={{ color: 'var(--accent)', fontWeight: 700 }}>₪{t.calculatedSalary}</span>
                   </td>
                   <td>
-                    <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t.notes || '—'}</span>
+                    {editingTeacherId === t.id ? (
+                      <input 
+                        className="input" 
+                        style={{ minWidth: 200, padding: '4px 8px' }}
+                        value={teacherNotes}
+                        onChange={e => setTeacherNotes(e.target.value)}
+                        placeholder="Add note..."
+                      />
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t.notes || '—'}</span>
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    {editingTeacherId === t.id ? (
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-primary btn-sm" onClick={saveTeacherNotes}>Save</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setEditingTeacherId(null)}>Cancel</button>
+                      </div>
+                    ) : (
+                      <button className="btn btn-ghost btn-sm" onClick={() => startEditNotes(t)}>✏️</button>
+                    )}
                   </td>
                 </tr>
               ))}
