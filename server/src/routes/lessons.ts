@@ -247,7 +247,25 @@ router.delete('/:id', async (req, res) => {
     if (!lesson) return res.status(404).json({ error: 'Lesson not found' })
 
     await prisma.$transaction(async (tx) => {
-      if (lesson.isProcessed && lesson.made && lesson.studentId) {
+      if (lesson.isBreak) {
+        const durationMins = timeToMins(lesson.endTime) - timeToMins(lesson.startTime)
+        const lessonsToShift = await tx.lesson.findMany({
+          where: { roomId: lesson.roomId }
+        })
+        const targetMins = timeToMins(lesson.endTime)
+
+        for (const l of lessonsToShift) {
+          if (l.id !== lesson.id && timeToMins(l.startTime) >= targetMins) {
+            await tx.lesson.update({
+              where: { id: l.id },
+              data: {
+                startTime: addMins(l.startTime, -durationMins),
+                endTime: addMins(l.endTime, -durationMins)
+              }
+            })
+          }
+        }
+      } else if (lesson.isProcessed && lesson.made && lesson.studentId) {
         const multiplier = getLessonMultiplier(lesson.startTime, lesson.endTime)
         await tx.student.update({
           where: { id: lesson.studentId },
