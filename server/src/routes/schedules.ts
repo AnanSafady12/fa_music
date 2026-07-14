@@ -83,42 +83,40 @@ router.post('/:id/copy-last-week', async (req, res) => {
     const parsedDate = new Date(targetDate)
 
     // Check if target already exists
-    let target = await prisma.schedule.findUnique({ where: { date: parsedDate } })
+    let target = await prisma.schedule.findUnique({ 
+      where: { date: parsedDate },
+      include: { rooms: true }
+    })
+
     if (!target) {
       target = await prisma.schedule.create({
         data: {
           dayName: targetDayName || source.dayName,
-          date: parsedDate,
-          rooms: { create: [{ name: 'Room 1' }, { name: 'Room 2' }, { name: 'Room 3' }] }
+          date: parsedDate
         },
         include: { rooms: true }
-      }) as any
-    }
-
-    const targetFull = await prisma.schedule.findUnique({
-      where: { id: (target as any).id },
-      include: { rooms: { include: { lessons: true } } }
-    })
-
-    // Clean up existing lessons in the target rooms first, and handle student completed lessons counts
-    const targetRoomIds = targetFull!.rooms.map(r => r.id)
-    const existingLessons = await prisma.lesson.findMany({
-      where: { roomId: { in: targetRoomIds } }
-    })
-
-    await prisma.$transaction(async (tx) => {
-      for (const lesson of existingLessons) {
-        if (lesson.isProcessed && lesson.made && lesson.studentId) {
-          await tx.student.update({
-            where: { id: lesson.studentId },
-            data: { completedLessons: { decrement: 1.0 } }
-          })
-        }
-      }
-      await tx.lesson.deleteMany({
+      })
+    } else {
+      // Clean up existing rooms and lessons in target first
+      const targetRoomIds = target.rooms.map(r => r.id)
+      const existingLessons = await prisma.lesson.findMany({
         where: { roomId: { in: targetRoomIds } }
       })
-    })
+
+      await prisma.$transaction(async (tx) => {
+        for (const lesson of existingLessons) {
+          if (lesson.isProcessed && lesson.made && lesson.studentId) {
+            await tx.student.update({
+              where: { id: lesson.studentId },
+              data: { completedLessons: { decrement: 1.0 } }
+            })
+          }
+        }
+        await tx.room.deleteMany({
+          where: { id: { in: targetRoomIds } }
+        })
+      })
+    }
 
     // Fetch all historical student-teacher assignments to determine regular teachers
     const historicalAssignments = await prisma.lesson.findMany({
@@ -161,17 +159,15 @@ router.post('/:id/copy-last-week', async (req, res) => {
     const teachers = await prisma.teacher.findMany()
     const students = await prisma.student.findMany()
 
-    // Copy lessons from source to corresponding matched-by-name rooms in target
+    // Copy rooms and lessons from source to target
     for (const srcRoom of source.rooms) {
-      let tgtRoom = targetFull!.rooms.find(r => r.name === srcRoom.name)
-      if (!tgtRoom) {
-        tgtRoom = await prisma.room.create({
-          data: {
-            name: srcRoom.name,
-            scheduleId: targetFull!.id
-          }
-        }) as any
-      }
+      const tgtRoom = await prisma.room.create({
+        data: {
+          name: srcRoom.name,
+          teacherId: srcRoom.teacherId,
+          scheduleId: target.id
+        }
+      })
 
       for (const lesson of srcRoom.lessons) {
         let resolvedTeacherId = lesson.teacherId
