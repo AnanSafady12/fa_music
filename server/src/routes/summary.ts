@@ -44,8 +44,7 @@ router.get('/', async (req, res) => {
     // 3. Define the time range for lessons
     const baseWhere: any = {
       made: true,
-      isBreak: false,
-      studentId: { not: null }
+      isBreak: false
     }
 
     if (month !== null && year !== null) {
@@ -306,8 +305,7 @@ router.get('/debug-july', async (req, res) => {
     const teachers = await prisma.teacher.findMany()
     const baseWhere: any = {
       made: true,
-      isBreak: false,
-      studentId: { not: null }
+      isBreak: false
     }
 
     const startDate = new Date(Date.UTC(year, month - 1, 1))

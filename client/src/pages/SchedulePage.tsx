@@ -906,7 +906,7 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
       </div>
       
       <div className="slot-student" style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-        <span className="slot-name">{lesson.student?.name}</span>
+        <span className="slot-name">{lesson.student?.name || 'Deleted Student'}</span>
         {rem <= 2 && (lesson.student?.totalLessons || 0) > 0 && (
           <span style={{ fontSize: 9, color: 'var(--red)' }}>⚠️</span>
         )}
