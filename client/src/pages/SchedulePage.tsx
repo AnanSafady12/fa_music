@@ -434,8 +434,7 @@ export default function SchedulePage() {
                 type="date" 
                 value={selectedDate} 
                 onChange={e => setSelectedDate(e.target.value)} 
-                onClick={e => e.stopPropagation()}
-                style={{ position: 'absolute', opacity: 0, top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }} 
+                style={{ position: 'absolute', opacity: 0, top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} 
               />
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{new Date(selectedDate).toLocaleDateString()}</span>
             </div>
