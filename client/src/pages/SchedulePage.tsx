@@ -336,10 +336,25 @@ export default function SchedulePage() {
   }
 
   const handleAddBreak = async () => {
-    if (!breakModal) return
-    await insertBreak({ roomId: breakModal.roomId, startTime: breakModal.time, durationMins: breakDuration, label: breakLabel })
-    setBreakModal(null); setBreakLabel('Break'); setBreakDuration(15)
-    await loadSchedule(selectedDate)
+    if (!breakModal || saving) return
+    setSaving(true)
+    try {
+      await insertBreak({ 
+        roomId: breakModal.roomId, 
+        startTime: breakModal.time, 
+        durationMins: Number(breakDuration) || 15, 
+        label: breakLabel || 'Break' 
+      })
+      await loadSchedule(selectedDate)
+      setBreakModal(null)
+      setBreakLabel('Break')
+      setBreakDuration(15)
+    } catch (err) {
+      console.error(err)
+      alert('Failed to insert break. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleRenameRoom = async (roomId: number, newName: string) => {
@@ -511,7 +526,11 @@ export default function SchedulePage() {
                   dayName={schedule.dayName}
                   onRemove={handleRemoveLesson}
                   onToggleAttendance={handleToggleAttendance}
-                  onAddBreak={(time) => setBreakModal({ roomId: room.id, time })}
+                  onAddBreak={(time) => {
+                    setBreakLabel('Break')
+                    setBreakDuration(15)
+                    setBreakModal({ roomId: room.id, time })
+                  }}
                   onRenameRoom={handleRenameRoom}
                   onClearRoom={handleClearRoom}
                   onEditDuration={(lesson) => setDurationModal({ lesson, duration: timeToMins(lesson.endTime) - timeToMins(lesson.startTime) })}
@@ -577,8 +596,10 @@ export default function SchedulePage() {
               <input className="input" type="number" min="5" step="5" value={breakDuration} onChange={e => setBreakDuration(Number(e.target.value))} />
             </div>
             <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setBreakModal(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleAddBreak}>Add Break</button>
+              <button className="btn btn-secondary" onClick={() => setBreakModal(null)} disabled={saving}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleAddBreak} disabled={saving}>
+                {saving ? 'Adding...' : 'Add Break'}
+              </button>
             </div>
           </div>
         </div>
