@@ -415,9 +415,28 @@ export default function SchedulePage() {
               setSelectedDate(newDate);
             }} style={{ fontSize: 24, width: 40, height: 40 }}>&lsaquo;</button>
             
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 20px', cursor: 'pointer', position: 'relative' }}>
+            <div 
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 20px', cursor: 'pointer', position: 'relative' }}
+              onClick={(e) => {
+                const input = e.currentTarget.querySelector('input');
+                if (input) {
+                  try {
+                    input.showPicker();
+                  } catch (err) {
+                    // Fallback if showPicker is not supported
+                    input.focus();
+                  }
+                }
+              }}
+            >
               <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{derivedDayName}</span>
-              <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ position: 'absolute', opacity: 0, top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
+              <input 
+                type="date" 
+                value={selectedDate} 
+                onChange={e => setSelectedDate(e.target.value)} 
+                onClick={e => e.stopPropagation()}
+                style={{ position: 'absolute', opacity: 0, top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }} 
+              />
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{new Date(selectedDate).toLocaleDateString()}</span>
             </div>
 
