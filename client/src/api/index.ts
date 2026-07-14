@@ -26,6 +26,7 @@ export const toggleAttendance = (id: number) => api.patch(`/lessons/${id}/attend
 export const deleteLesson = (id: number) => api.delete(`/lessons/${id}`).then(r => r.data)
 
 export const updateRoom = (id: number, data: any) => api.put(`/schedules/rooms/${id}`, data).then(r => r.data)
+export const clearRoomLessons = (roomId: number) => api.delete(`/schedules/rooms/${roomId}/lessons`).then(r => r.data)
 export const getSummary = (month?: number, year?: number) => api.get('/summary', { params: { month, year } }).then(r => r.data)
 export const updateTeacherStats = (data: { teacherId: number, month: number, year: number, notes?: string, manualSalary?: number | null }) => 
   api.put('/summary/teacher-stats', data).then(r => r.data)

@@ -251,4 +251,35 @@ router.put('/rooms/:id', async (req, res) => {
   }
 })
 
+// DELETE all lessons in a room
+router.delete('/rooms/:id/lessons', async (req, res) => {
+  try {
+    const roomId = Number(req.params.id)
+    
+    // Find all lessons in this room to adjust student counts
+    const lessons = await prisma.lesson.findMany({
+      where: { roomId }
+    })
+
+    await prisma.$transaction(async (tx) => {
+      for (const lesson of lessons) {
+        if (lesson.isProcessed && lesson.made && lesson.studentId) {
+          await tx.student.update({
+            where: { id: lesson.studentId },
+            data: { completedLessons: { decrement: 1.0 } }
+          })
+        }
+      }
+      await tx.lesson.deleteMany({
+        where: { roomId }
+      })
+    })
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to delete room lessons' })
+  }
+})
+
 export default router

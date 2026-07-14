@@ -8,7 +8,7 @@ import {
   getStudents, getScheduleByDate, createSchedule, createLesson, updateLesson,
   deleteLesson, toggleAttendance, copyLastWeek, getSchedules,
   createStudent, updateStudent, deleteStudent, insertBreak, updateRoom,
-  getTeachers
+  getTeachers, clearRoomLessons
 } from '../api'
 import './SchedulePage.css'
 
@@ -350,6 +350,20 @@ export default function SchedulePage() {
     } finally { setSaving(false) }
   }
 
+  const handleClearRoom = async (roomId: number) => {
+    if (!window.confirm("Are you sure you want to delete all scheduled lessons in this room?")) return
+    setSaving(true)
+    try {
+      await clearRoomLessons(roomId)
+      await loadSchedule(selectedDate)
+    } catch (err) {
+      console.error(err)
+      alert("Failed to delete lessons in this room.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const openAddStudent = () => { setEditingStudent(null); setStudentForm({ name: '', parentName: '', phone: '', phone2: '', age: '', instrument: '', totalLessons: PACKAGES.STANDARD.lessons, completedLessons: 0, hasPaid: false, paidPacks: '', notes: '' }); setStudentModal(true) }
   const openEditStudent = (s: Student) => { setEditingStudent(s); setStudentForm({ name: s.name, parentName: s.parentName || '', phone: s.phone || '', phone2: s.phone2 || '', age: s.age || '', instrument: s.instrument || '', totalLessons: s.totalLessons, completedLessons: s.completedLessons, hasPaid: s.hasPaid, paidPacks: s.paidPacks || '', notes: s.notes || '' }); setStudentModal(true) }
   const saveStudent = async () => {
@@ -499,6 +513,7 @@ export default function SchedulePage() {
                   onToggleAttendance={handleToggleAttendance}
                   onAddBreak={(time) => setBreakModal({ roomId: room.id, time })}
                   onRenameRoom={handleRenameRoom}
+                  onClearRoom={handleClearRoom}
                   onEditDuration={(lesson) => setDurationModal({ lesson, duration: timeToMins(lesson.endTime) - timeToMins(lesson.startTime) })}
                   onEditTeacher={handleEditLessonTeacher}
                   teachers={teachers}
@@ -797,12 +812,13 @@ function generateRoomTimeline(_dayName: string, lessons: Lesson[]) {
   return items
 }
 
-function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom, onEditDuration, onEditTeacher, teachers }: {
+function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onAddBreak, onRenameRoom, onClearRoom, onEditDuration, onEditTeacher, teachers }: {
   room: Room; roomIndex: number; dayName: string;
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
   onAddBreak: (time: string) => void
   onRenameRoom: (id: number, name: string) => void
+  onClearRoom: (id: number) => void
   onEditDuration: (lesson: Lesson) => void
   onEditTeacher: (lesson: Lesson) => void
   teachers: Teacher[]
@@ -812,7 +828,7 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
 
   return (
     <div className="room-card">
-      <div className="room-header">
+      <div className="room-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {isRenaming ? (
           <input 
             className="input" 
@@ -824,7 +840,19 @@ function RoomTable({ room, roomIndex, dayName, onRemove, onToggleAttendance, onA
             onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
           />
         ) : (
-          <span className="room-name" onDoubleClick={() => setIsRenaming(true)} style={{ cursor: 'pointer' }} title="Double-click to rename">{room.name} ✏️</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="room-name" onDoubleClick={() => setIsRenaming(true)} style={{ cursor: 'pointer' }} title="Double-click to rename">{room.name} ✏️</span>
+            {room.lessons.length > 0 && (
+              <button 
+                className="btn btn-ghost btn-sm" 
+                onClick={() => onClearRoom(room.id)} 
+                title="Delete all lessons in this room"
+                style={{ padding: '0 4px', fontSize: 12, height: 20, width: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                🗑️
+              </button>
+            )}
+          </div>
         )}
         <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{room.lessons.length} lessons</span>
       </div>
