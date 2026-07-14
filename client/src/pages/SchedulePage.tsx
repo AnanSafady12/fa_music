@@ -45,13 +45,46 @@ export default function SchedulePage() {
   } | null>(null)
 
   const loadStudents = async () => setStudents(await getStudents())
-  const loadAllSchedules = async () => setAllSchedules(await getSchedules())
+  const loadAllSchedules = useCallback(async () => {
+    try {
+      const data = await getSchedules()
+      setAllSchedules(data)
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
   const loadTeachers = async () => {
     try {
       setTeachers(await getTeachers())
     } catch (err) {
       console.error(err)
     }
+  }
+
+  const checkIfScheduledInWeek = (studentId: number) => {
+    if (!selectedDate || !allSchedules.length) return false
+    
+    // 1. Get Sunday and Saturday of the selectedDate week
+    const [y, m, d] = selectedDate.split('-').map(Number)
+    const date = new Date(y, m - 1, d)
+    const dayOfWeek = date.getDay() // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    
+    const sunday = new Date(date)
+    sunday.setDate(date.getDate() - dayOfWeek)
+    sunday.setHours(0, 0, 0, 0)
+
+    const saturday = new Date(sunday)
+    saturday.setDate(sunday.getDate() + 6)
+    saturday.setHours(23, 59, 59, 999)
+
+    // 2. Check if this student has any lessons in any schedule in this range
+    return allSchedules.some(s => {
+      const sDate = new Date(s.date)
+      if (sDate >= sunday && sDate <= saturday) {
+        return s.rooms.some(r => r.lessons.some(l => l.studentId === studentId))
+      }
+      return false
+    })
   }
 
   const loadSchedule = useCallback(async (date: string) => {
@@ -64,14 +97,14 @@ export default function SchedulePage() {
         const derived = DAY_NAMES[new Date(date + 'T12:00:00Z').getUTCDay()]
         const s = await createSchedule({ dayName: derived, date })
         setSchedule(s)
-        loadAllSchedules()
       } catch (err) {
         setSchedule(null)
       }
     } finally {
       setLoading(false)
+      loadAllSchedules()
     }
-  }, [])
+  }, [loadAllSchedules])
 
   useEffect(() => {
     loadStudents()
@@ -500,7 +533,7 @@ export default function SchedulePage() {
             </select>
             <div className="student-list">
               {filteredStudents.map(s => (
-                <DraggableStudentCard key={s.id} student={s} schedule={schedule} />
+                <DraggableStudentCard key={s.id} student={s} isScheduled={checkIfScheduledInWeek(s.id)} />
               ))}
               {filteredStudents.length === 0 && (
                 <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: 20 }}>No students</div>
@@ -771,10 +804,9 @@ export default function SchedulePage() {
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 
 
-function DraggableStudentCard({ student, schedule }: { student: Student; schedule: Schedule | null }) {
+function DraggableStudentCard({ student, isScheduled }: { student: Student; isScheduled: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `student-${student.id}` })
   const rem = student.totalLessons - student.completedLessons
-  const isScheduled = schedule?.rooms.some(r => r.lessons.some(l => l.studentId === student.id))
 
   return (
     <div
