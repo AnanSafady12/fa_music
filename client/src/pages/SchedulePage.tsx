@@ -908,6 +908,7 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
         endTimeStr={endTimeStr}
         onRemove={onRemove}
         onToggleAttendance={onToggleAttendance}
+        onAddBreak={onAddBreak}
         onEditDuration={onEditDuration}
         onEditTeacher={onEditTeacher}
         teachers={teachers}
@@ -924,13 +925,14 @@ function TimeSlot({ roomIndex, time, duration, lesson, onRemove, onToggleAttenda
   )
 }
 
-function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance, onEditDuration, onEditTeacher, teachers }: {
+function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove, onToggleAttendance, onAddBreak, onEditDuration, onEditTeacher, teachers }: {
   setDropRef: (el: HTMLElement | null) => void
   lesson: Lesson
   time: string
   endTimeStr: string
   onRemove: (id: number) => void
   onToggleAttendance: (id: number) => void
+  onAddBreak: (time: string) => void
   onEditDuration: (lesson: Lesson) => void
   onEditTeacher: (lesson: Lesson) => void
   teachers: Teacher[]
@@ -999,15 +1001,23 @@ function DraggableOccupiedSlot({ setDropRef, lesson, time, endTimeStr, onRemove,
       
       <div className="slot-actions">
         <button
+          className="btn btn-ghost btn-sm"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddBreak(endTimeStr); }}
+          title="Add break after this lesson"
+          style={{ padding: '2px 4px', fontSize: 10, cursor: 'pointer', opacity: 0.8 }}
+        >
+          ☕
+        </button>
+        <button
           className={`btn btn-sm ${lesson.made ? 'btn-ghost' : 'btn-danger'}`}
-          onClick={() => onToggleAttendance(lesson.id)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleAttendance(lesson.id); }}
           title={lesson.made ? 'Mark as not made' : 'Mark as made'}
           style={{ padding: '2px 6px', fontSize: 10 }}
         >
           {lesson.made ? '✓' : '✗'}
         </button>
-        <button className="slot-remove" onClick={() => onEditDuration(lesson)} title="Edit Duration">⏱️</button>
-        <button className="slot-remove" onClick={() => onRemove(lesson.id)}>✕</button>
+        <button className="slot-remove" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditDuration(lesson); }} title="Edit Duration">⏱️</button>
+        <button className="slot-remove" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(lesson.id); }} title="Remove lesson">✕</button>
       </div>
     </div>
   )
